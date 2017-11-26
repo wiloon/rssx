@@ -6,7 +6,7 @@ import (
 	"io"
 )
 
-func download() {
+func Download() {
 	url := "http://www.oschina.net/news/rss"
 	res, err := http.Get(url)
 	if err != nil {
