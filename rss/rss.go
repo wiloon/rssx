@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"log"
+
 	"wiloon.com/rssx/news"
 )
 
@@ -65,7 +66,7 @@ func main() {
 	osChina := news.Site{Title: "osChina"}
 	for i, v := range v.Chan.Items {
 		log.Printf("index:%v, title:%v", i, v.Title)
-		osChina.Append(v.Title)
+		osChina.Append(v.Title, v.Link, v.Description)
 	}
 	osChina.Save()
 }
