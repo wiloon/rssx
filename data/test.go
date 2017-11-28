@@ -10,15 +10,16 @@ var db *sql.DB
 
 func init() {
 	var err error
-	db, err = sql.Open("mysql", "user0:password0@tcp(192.168.1.108:3306)/rssx?charset=utf8")
+	db, err = sql.Open("mysql", "user0:password0@tcp(localhost:3306)/rssx?charset=utf8")
 	if err != nil {
 		log.Println("failed to connect to db;", err)
 	}
 }
 
-func Find(feedId int) {
+func Find(feedId int) []string {
 	rows, err := db.Query("SELECT title FROM news where feed_id=0")
 	checkErr(err)
+	var result []string
 
 	for rows.Next() {
 		var title string
@@ -27,9 +28,11 @@ func Find(feedId int) {
 		checkErr(err)
 
 		log.Println(title)
+		result = append(result, title)
 	}
-
+	return result
 }
+
 func Save(title, url, description string) {
 
 	//插入数据
