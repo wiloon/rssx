@@ -3,6 +3,8 @@ package main
 import (
 	"net/http"
 	"log"
+	"wiloon.com/rssx/feed"
+	"encoding/json"
 )
 
 type httpServer struct {
@@ -10,8 +12,11 @@ type httpServer struct {
 
 func (server httpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//refresh news
+	feed := feed.Feed{}
+	list := feed.GetNews()
+	jsonstr, _ := json.Marshal(list)
 
-	w.Write([]byte("{\"Status\":\"SUCCESS\"}"))
+	w.Write([]byte(jsonstr))
 }
 
 const port = "3000"

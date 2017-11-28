@@ -8,6 +8,6 @@ type Feed struct {
 	url    string
 }
 
-func (feed *Feed) GetNews() {
-	data.Find(0)
+func (feed *Feed) GetNews() []string {
+	return data.Find(0)
 }
