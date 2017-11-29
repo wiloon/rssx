@@ -23,7 +23,7 @@ const port = "3000"
 
 func main() {
 	log.Println("server starting...")
-	http.Handle("/", http.FileServer(http.Dir("/home/wiloon/projects/rssx-client/dist")))
+	http.Handle("/", http.FileServer(http.Dir("/home/roy/my-projects/rssx-client/dist")))
 	var server httpServer
 	http.Handle("/refresh", server)
 	http.ListenAndServe(":"+port, nil)

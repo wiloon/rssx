@@ -36,7 +36,7 @@ type item struct {
 }
 
 func main() {
-	file, err := os.Open("/home/wiloon/projects/gopath/src/wiloon.com/rssx/utils/osChina.xml") // For read access.
+	file, err := os.Open("/home/roy/gopath/src/wiloon.com/rssx/osChina.xml") // For read access.
 	if err != nil {
 		fmt.Printf("error: %v", err)
 		return
