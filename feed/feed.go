@@ -3,9 +3,9 @@ package feed
 import "wiloon.com/rssx/data"
 
 type Feed struct {
-	feedId int
-	title  string
-	url    string
+	Id    int
+	Title string
+	Url   string
 }
 
 func (feed *Feed) GetNews() []string {
