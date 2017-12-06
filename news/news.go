@@ -1,9 +1,5 @@
 package news
 
-import (
-	"wiloon.com/rssx/data"
-)
-
 func init() {
 
 }
@@ -15,6 +11,7 @@ type Site struct {
 	NewsList []News
 }
 type News struct {
+	Id          int64
 	Title       string
 	Url         string
 	Description string
@@ -23,10 +20,11 @@ type News struct {
 func (site *Site) Append(title, url, description string) {
 	site.NewsList = append(site.NewsList, News{Title: title, Url: url, Description: description})
 }
-func (site *Site) Save() {
 
-	for _, v := range site.NewsList {
-		data.Save(v.Title, v.Url, v.Description)
-	}
-
-}
+//func (site *Site) Save() {
+//
+//	for _, v := range site.NewsList {
+//		data.Save(v.Title, v.Url, v.Description)
+//	}
+//
+//}
