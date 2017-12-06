@@ -7,7 +7,7 @@ import (
 	"os"
 	"log"
 
-	"wiloon.com/rssx/news"
+	"wiloon.com/rssx/data"
 )
 
 type Rss struct {
@@ -33,22 +33,23 @@ type item struct {
 	Link        string   `xml:"link"`
 	Category    string   `xml:"category"`
 	Description string   `xml:"description"`
+	Guid        string   `xml:"guid"`
 }
 
 func main() {
-	file, err := os.Open("/home/roy/gopath/src/wiloon.com/rssx/osChina.xml") // For read access.
+	file, err := os.Open("/home/wiloon/projects/gopath/src/wiloon.com/rssx/utils/osChina.xml") // For read access.
 	if err != nil {
 		fmt.Printf("error: %v", err)
 		return
 	}
 	defer file.Close()
-	data, err := ioutil.ReadAll(file)
+	filedata, err := ioutil.ReadAll(file)
 	if err != nil {
 		fmt.Printf("error: %v", err)
 		return
 	}
 	v := Rss{}
-	err = xml.Unmarshal(data, &v)
+	err = xml.Unmarshal(filedata, &v)
 	if err != nil {
 		fmt.Printf("error: %v", err)
 		return
@@ -63,10 +64,12 @@ func main() {
 	log.Println("channel.link:", v.Chan.Link)
 	log.Println("channel.items:", v.Chan.Items[0].Title)
 	log.Println("channel.items:", v.Chan.Items[1].Title)
-	osChina := news.Site{Title: "osChina"}
+
 	for i, v := range v.Chan.Items {
 		log.Printf("index:%v, title:%v", i, v.Title)
-		osChina.Append(v.Title, v.Link, v.Description)
+
+		data.SaveNews(v.Guid, v.Title, v.Link, v.Description)
+
 	}
-	osChina.Save()
+
 }
