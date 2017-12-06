@@ -8,13 +8,13 @@ import (
 
 var db *sql.DB
 
-func init() {
-	var err error
-	db, err = sql.Open("mysql", "user0:password0@tcp(localhost:3306)/rssx?charset=utf8")
-	if err != nil {
-		log.Println("failed to connect to db;", err)
-	}
-}
+//func init() {
+//	var err error
+//	db, err = sql.Open("mysql", "user0:password0@tcp(localhost:3306)/rssx?charset=utf8")
+//	if err != nil {
+//		log.Println("failed to connect to db;", err)
+//	}
+//}
 
 func Find(feedId int) []string {
 	rows, err := db.Query("SELECT title FROM news where feed_id=0")
