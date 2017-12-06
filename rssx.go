@@ -3,8 +3,9 @@ package main
 import (
 	"net/http"
 	"log"
-	"wiloon.com/rssx/feed"
 	"encoding/json"
+
+	"wiloon.com/rssx/data"
 )
 
 type httpServer struct {
@@ -12,7 +13,8 @@ type httpServer struct {
 
 func (server httpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	feeds := []feed.Feed{feed.Feed{Id: 0, Title: "t0", Url: "u0"}, feed.Feed{Id: 1, Title: "t1", Url: "u1"}}
+	// feeds := []feed.Feed{feed.Feed{Id: 0, Title: "t0", Url: "u0"}, feed.Feed{Id: 1, Title: "t1", Url: "u1"}}
+	feeds := data.FindUserFeeds(0)
 
 	jsonStr, _ := json.Marshal(feeds)
 
@@ -23,7 +25,7 @@ const port = "3000"
 
 func main() {
 	log.Println("server starting...")
-	http.Handle("/", http.FileServer(http.Dir("/home/roy/my-projects/rssx-client/dist")))
+	http.Handle("/", http.FileServer(http.Dir("/home/wiloon/projects/rssx-client/dist")))
 
 	var server httpServer
 	http.Handle("/api/feeds", server)
