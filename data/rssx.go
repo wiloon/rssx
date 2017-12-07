@@ -30,7 +30,7 @@ func FindUserFeeds(userId int) []feed.Feed {
 }
 
 func FindNewsListByFeed(feedId int) []news.News {
-	stmt := "select * from news where feed_id=?"
+	stmt := "select un.news_id as unread_news_id,n.news_id,n.title,n.url,n.description from news n left join user_news un on n.news_id=un.news_id where un.news_id is null and n.feed_id=?"
 	result := rssx.Find(stmt, []interface{}{feedId}...)
 	var newsList []news.News
 	for _, v := range result {
@@ -47,7 +47,7 @@ func FindNewsListByFeed(feedId int) []news.News {
 }
 
 func FindNews(newsId int) news.News {
-	stmt := "select * from news where news_id=?"
+	stmt := "select * from news where news_id>=? order by news_id limit 2"
 	result := rssx.Find(stmt, []interface{}{newsId}...)
 	var newsList []news.News
 	for _, v := range result {
@@ -60,6 +60,7 @@ func FindNews(newsId int) news.News {
 		})
 
 	}
+	newsList[0].NextId = newsList[1].Id
 	return newsList[0]
 }
 
@@ -83,4 +84,9 @@ func FindFeeds() []feed.Feed {
 
 	}
 	return feeds
+}
+
+func MarkNewsRead(userId, newsId int) {
+	stmt := "INSERT user_news SET  user_id=?,news_id=?,read_mark=?"
+	rssx.Save(stmt, []interface{}{userId, newsId, 1}...)
 }
