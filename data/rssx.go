@@ -16,13 +16,14 @@ func init() {
 }
 
 func FindUserFeeds(userId int) []feed.Feed {
-	stmt := "select f.id,f.title from user_feed uf join feed f on uf.feed_id=f.id where user_id=?"
+	stmt := "select f.feed_id,f.title from user_feed uf join feed f on uf.feed_id=f.feed_id where user_id=?"
+
 	result := rssx.Find(stmt, []interface{}{userId}...)
 	var feeds []feed.Feed
 	for _, v := range result {
 		log.Info(v)
 
-		feeds = append(feeds, feed.Feed{Id: v["id"].(int64), Title: string(v["title"].([]uint8))})
+		feeds = append(feeds, feed.Feed{Id: v["feed_id"].(int64), Title: string(v["title"].([]uint8))})
 
 	}
 	return feeds
@@ -62,7 +63,24 @@ func FindNews(newsId int) news.News {
 	return newsList[0]
 }
 
-func SaveNews(newsId, title, url, description string) {
+func SaveNews(feedId []uint8, title, url, description string) {
 	stmt := "INSERT news SET  feed_id=?,title=?,url=?,description=?"
-	rssx.Save(stmt, []interface{}{0, title, url, description}...)
+	rssx.Save(stmt, []interface{}{feedId, title, url, description}...)
+}
+
+func FindFeeds() []feed.Feed {
+	stmt := "select feed_id,title,url from feed where deleted=?"
+	result := rssx.Find(stmt, []interface{}{0}...)
+	var feeds []feed.Feed
+	for _, v := range result {
+		log.Info(v)
+
+		feeds = append(feeds, feed.Feed{
+			Id:    v["feed_id"].(int64),
+			Title: string(v["title"].([]uint8)),
+			Url:   string(v["url"].([]uint8)),
+		})
+
+	}
+	return feeds
 }
