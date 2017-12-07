@@ -15,6 +15,7 @@ type News struct {
 	Title       string
 	Url         string
 	Description string
+	NextId      int64
 }
 
 func (site *Site) Append(title, url, description string) {

@@ -11,13 +11,15 @@ import (
 	"github.com/wiloon/wiloon-log/log"
 )
 
+const userId = 0
+
 type httpServer struct {
 }
 
 func (server httpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// feeds := []feed.Feed{feed.Feed{Id: 0, Title: "t0", Url: "u0"}, feed.Feed{Id: 1, Title: "t1", Url: "u1"}}
-	feeds := data.FindUserFeeds(0)
+	feeds := data.FindUserFeeds(userId)
 
 	jsonStr, _ := json.Marshal(feeds)
 	log.Info("api feeds:", jsonStr)
@@ -46,9 +48,11 @@ func (server NewsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// feeds := []feed.Feed{feed.Feed{Id: 0, Title: "t0", Url: "u0"}, feed.Feed{Id: 1, Title: "t1", Url: "u1"}}
 	r.ParseForm();
-	id, _ := strconv.Atoi(r.Form.Get("id"))
-	news := data.FindNews(id)
+	newsId, _ := strconv.Atoi(r.Form.Get("id"))
+	news := data.FindNews(newsId)
 
+	//mark  as read
+	data.MarkNewsRead(userId, newsId)
 	jsonStr, _ := json.Marshal(news)
 	w.Write([]byte(jsonStr))
 }
