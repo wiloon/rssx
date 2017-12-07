@@ -2,11 +2,13 @@ package main
 
 import (
 	"net/http"
-	"log"
+
 	"encoding/json"
 
 	"wiloon.com/rssx/data"
 	"strconv"
+
+	"github.com/wiloon/wiloon-log/log"
 )
 
 type httpServer struct {
@@ -18,7 +20,7 @@ func (server httpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	feeds := data.FindUserFeeds(0)
 
 	jsonStr, _ := json.Marshal(feeds)
-
+	log.Info("api feeds:", jsonStr)
 	w.Write([]byte(jsonStr))
 }
 
@@ -54,17 +56,18 @@ func (server NewsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 const port = "3000"
 
 func main() {
-	log.Println("server starting...")
-	http.Handle("/", http.FileServer(http.Dir("/home/roy/my-projects/rssx-client/dist")))
+	log.Info("server starting...")
+	http.Handle("/", http.FileServer(http.Dir("/home/wiloon/projects/rssx-client/dist")))
 
 	var server httpServer
 	http.Handle("/api/feeds", server)
+
 	var newsListServer NewsListServer
 	http.Handle("/api/news-list", newsListServer)
 
 	var newsServer NewsServer
 	http.Handle("/api/news", newsServer)
-	log.Println("rssx listening:", port)
+	log.Info("rssx listening:", port)
 
 	http.ListenAndServe(":"+port, nil)
 }
