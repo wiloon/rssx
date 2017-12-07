@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/wiloon/wiloon-log/log"
+	"wiloon.com/rssx/rss"
 )
 
 const userId = 0
@@ -61,6 +62,10 @@ const port = "3000"
 
 func main() {
 	log.Info("server starting...")
+
+	//start rss sync
+	go rss.Sync()
+
 	http.Handle("/", http.FileServer(http.Dir("/home/wiloon/projects/rssx-client/dist")))
 
 	var server httpServer

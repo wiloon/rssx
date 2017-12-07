@@ -1,5 +1,7 @@
 package news
 
+
+
 func init() {
 
 }
@@ -16,6 +18,7 @@ type News struct {
 	Url         string
 	Description string
 	NextId      int64
+	PubDate     string
 }
 
 func (site *Site) Append(title, url, description string) {
