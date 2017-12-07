@@ -26,4 +26,5 @@ type item struct {
 	Category    string   `xml:"category"`
 	Description string   `xml:"description"`
 	Guid        string   `xml:"guid"`
+	PubDate 	string   `xml:"pubDate"`
 }
