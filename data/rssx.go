@@ -28,7 +28,7 @@ func FindUserFeeds(userId int) []feed.Feed {
 	return feeds
 }
 
-func FindNewsByFeed(feedId int) []news.News {
+func FindNewsListByFeed(feedId int) []news.News {
 	stmt := "select * from news where feed_id=?"
 	result := rssx.Find(stmt, []interface{}{feedId}...)
 	var newsList []news.News
@@ -43,6 +43,23 @@ func FindNewsByFeed(feedId int) []news.News {
 
 	}
 	return newsList
+}
+
+func FindNews(newsId int) news.News {
+	stmt := "select * from news where news_id=?"
+	result := rssx.Find(stmt, []interface{}{newsId}...)
+	var newsList []news.News
+	for _, v := range result {
+
+		log.Info(v)
+		newsList = append(newsList, news.News{Id: v["news_id"].(int64),
+			Title: string(v["title"].([]uint8)),
+			Url: string(v["url"].([]uint8)),
+			Description: string(v["description"].([]uint8)),
+		})
+
+	}
+	return newsList[0]
 }
 
 func SaveNews(newsId, title, url, description string) {
