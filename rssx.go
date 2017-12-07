@@ -66,7 +66,7 @@ func main() {
 	//start rss sync
 	go rss.Sync()
 
-	http.Handle("/", http.FileServer(http.Dir("/home/wiloon/projects/rssx-client/dist")))
+	http.Handle("/", http.FileServer(http.Dir("dist")))
 
 	var server httpServer
 	http.Handle("/api/feeds", server)
