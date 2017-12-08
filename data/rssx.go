@@ -31,38 +31,43 @@ func FindUserFeeds(userId int) []feed.Feed {
 }
 
 func FindNewsListByFeed(feedId int) []news.News {
-	stmt := "select un.news_id as unread_news_id,n.news_id,n.title,n.url,n.description from news n left join user_news un on n.news_id=un.news_id where un.news_id is null and n.feed_id=? order by news_id "
+	stmt := `select un.news_id as unread_news_id,n.news_id,n.title,n.url,n.description
+from news n left join user_news un on n.news_id=un.news_id
+where un.news_id is null and n.feed_id=? order by news_id`
+
 	result := rssx.Find(stmt, []interface{}{feedId}...)
 	var newsList []news.News
 	for _, v := range result {
-		log.Info(v)
-
 		newsList = append(newsList, news.News{Id: v["news_id"].(int64),
 			Title: string(v["title"].([]uint8)),
 			Url: string(v["url"].([]uint8)),
 			Description: string(v["description"].([]uint8)),
 		})
-
 	}
 	return newsList
 }
 
 func FindNews(newsId int) news.News {
+	var newsRtn news.News
+
 	stmt := "select * from news where news_id>=? order by news_id limit 2"
 	result := rssx.Find(stmt, []interface{}{newsId}...)
 	var newsList []news.News
 	for _, v := range result {
-
-		log.Info(v)
 		newsList = append(newsList, news.News{Id: v["news_id"].(int64),
 			Title: string(v["title"].([]uint8)),
 			Url: string(v["url"].([]uint8)),
 			Description: string(v["description"].([]uint8)),
 		})
-
 	}
-	newsList[0].NextId = newsList[1].Id
-	return newsList[0]
+	if len(newsList) > 1 {
+		newsList[0].NextId = newsList[1].Id
+	}
+
+	if len(newsList) > 0 {
+		newsRtn = newsList[0]
+	}
+	return newsRtn
 }
 
 func SaveNews(feedId int64, title, url, description string, pubDate time.Time, guid string) {
