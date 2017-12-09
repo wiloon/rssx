@@ -30,12 +30,37 @@ func FindUserFeeds(userId int) []feed.Feed {
 	return feeds
 }
 
-func FindNewsListByFeed(feedId int) []news.News {
-	stmt := `select un.news_id as unread_news_id,n.news_id,n.title,n.url,n.description
-from news n left join user_news un on n.news_id=un.news_id
-where un.news_id is null and n.feed_id=? order by news_id`
+func FindAllNewsForUser(userId int) []news.News {
+	stmt := `
+SELECT nrm.news_id AS unread_news_id,n.news_id,n.title,n.url,n.description  from news n
+JOIN user_feed uf ON uf.user_id=? AND n.feed_id=uf.feed_id
+LEFT JOIN news_read_mark nrm ON nrm.user_id=? and n.news_id=nrm.news_id
+where nrm.news_id IS NULL
+ORDER BY n.news_id
+`
 
-	result := rssx.Find(stmt, []interface{}{feedId}...)
+	result := rssx.Find(stmt, []interface{}{userId, userId}...)
+	var newsList []news.News
+	for _, v := range result {
+		newsList = append(newsList, news.News{Id: v["news_id"].(int64),
+			Title: string(v["title"].([]uint8)),
+			Url: string(v["url"].([]uint8)),
+			Description: string(v["description"].([]uint8)),
+		})
+	}
+	return newsList
+}
+
+func FindNewsListByUserFeed(userId, feedId int) []news.News {
+	stmt := `
+SELECT nrm.news_id AS unread_news_id,n.news_id,n.title,n.url,n.description  from news n
+JOIN user_feed uf ON uf.user_id=? and uf.feed_id=? AND n.feed_id=uf.feed_id
+LEFT JOIN news_read_mark nrm ON nrm.user_id=? and n.news_id=nrm.news_id
+where nrm.news_id IS NULL
+ORDER BY n.news_id
+`
+
+	result := rssx.Find(stmt, []interface{}{userId, feedId, userId}...)
 	var newsList []news.News
 	for _, v := range result {
 		newsList = append(newsList, news.News{Id: v["news_id"].(int64),
@@ -87,14 +112,13 @@ func FindFeeds() []feed.Feed {
 			Title: string(v["title"].([]uint8)),
 			Url:   string(v["url"].([]uint8)),
 		})
-
 	}
 	return feeds
 }
 
 func MarkNewsRead(userId, newsId int) {
-	stmt := "INSERT user_news SET  user_id=?,news_id=?,read_mark=?"
-	rssx.Save(stmt, []interface{}{userId, newsId, 1}...)
+	stmt := "INSERT news_read_mark SET  user_id=?,news_id=?"
+	rssx.Save(stmt, []interface{}{userId, newsId}...)
 }
 
 func FindLatestNewsByFeed(feedId int64) news.News {
@@ -110,9 +134,7 @@ func FindLatestNewsByFeed(feedId int64) news.News {
 			Description: string(v["description"].([]uint8)),
 			PubDate: string(v["pub_date"].([]uint8)),
 		})
-
 	}
-
 	return newsList[0]
 }
 
@@ -121,7 +143,6 @@ func FindNewsByGuid(guid string) []news.News {
 	result := rssx.Find(stmt, []interface{}{guid}...)
 	var newsList []news.News
 	for _, v := range result {
-
 		log.Info(v)
 		newsList = append(newsList, news.News{Id: v["news_id"].(int64)})
 	}

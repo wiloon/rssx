@@ -9,6 +9,7 @@ import (
 	"github.com/wiloon/wiloon-log/log"
 	"wiloon.com/rssx/feed"
 	"time"
+	"strings"
 )
 
 func Sync() {
@@ -24,6 +25,7 @@ func Sync() {
 }
 
 func SyncFeed(feed feed.Feed) {
+	log.Info("sync feed:", feed)
 
 	res, err := http.Get(feed.Url)
 	if err != nil {
@@ -37,7 +39,8 @@ func SyncFeed(feed feed.Feed) {
 	if res.StatusCode == http.StatusOK {
 		remoteFeedBody, _ = ioutil.ReadAll(res.Body)
 		bodyString := string(remoteFeedBody)
-		fmt.Print(bodyString)
+
+		log.Debug("get feed OK, feed body:", bodyString)
 	}
 
 	v := Rss{}
@@ -47,27 +50,22 @@ func SyncFeed(feed feed.Feed) {
 		return
 	}
 
-	log.Info(v)
-	log.Info("xml name:", v.XMLName)
-	log.Info("Version:", v.Version)
-	log.Info("Description:", v.Description)
-	log.Info("channel:", v.Chan)
-	log.Info("channel.title:", v.Chan.Title)
-	log.Info("channel.link:", v.Chan.Link)
-	log.Info("channel.items:", v.Chan.Items[0].Title)
-	log.Info("channel.items:", v.Chan.Items[1].Title)
-
 	for i, v := range v.Chan.Items {
 		// compare and save
 
-		log.Info("index:%v, title:%v", i, v.Title)
+		log.Info("index:", i, ", title:", string(v.Title))
+
 		url := v.Link
 		pubDate, _ := time.Parse(time.RFC1123Z, v.PubDate)
 		guid := v.Guid
+		if strings.EqualFold(guid, "") {
+			guid = v.Link
+		}
 		//check if guid is exist
 		found := data.FindNewsByGuid(guid)
+		exist := len(found) == 1
 
-		if len(found) == 0 {
+		if !exist {
 			data.SaveNews(feed.Id, v.Title, url, v.Description, pubDate, guid)
 		}
 	}
