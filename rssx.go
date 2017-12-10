@@ -16,11 +16,11 @@ import (
 
 const userId = 0
 
-type httpServer struct {
+type HttpServer struct {
 }
 
 // user feeds
-func (server httpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (server HttpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	feeds := []feed.Feed{{Id: -1, Title: "All", Url: ""}}
 
@@ -64,14 +64,25 @@ func (server NewsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// feeds := []feed.Feed{feed.Feed{Id: 0, Title: "t0", Url: "u0"}, feed.Feed{Id: 1, Title: "t1", Url: "u1"}}
 	r.ParseForm();
 	newsId, _ := strconv.Atoi(r.Form.Get("id"))
+	feedId, _ := strconv.Atoi(r.Form.Get("feedId"))
 
-	news := data.FindNews(newsId)
-	log.Info("show news:", news.Title)
+	thisNews := data.FindNews(newsId)
 
-	//mark  as read
-	data.MarkNewsRead(userId, newsId)
-	jsonStr, _ := json.Marshal(news)
-	w.Write([]byte(jsonStr))
+	if thisNews.Id != 0 {
+		next := news.News{}
+		if feedId == -1 {
+			next = data.FindNextNews(userId, newsId)
+		} else {
+			next = data.FindNextNewsByFeed(userId, feedId, newsId)
+		}
+		thisNews.NextId = next.Id
+		log.Info("show news:", thisNews.Title, ", next:", thisNews.NextId)
+
+		//mark  as read
+		data.MarkNewsRead(userId, newsId)
+		jsonStr, _ := json.Marshal(thisNews)
+		w.Write([]byte(jsonStr))
+	}
 
 }
 
@@ -87,7 +98,7 @@ func main() {
 	log.Info("client dir:", dir)
 	http.Handle("/", http.FileServer(http.Dir(dir)))
 
-	var server httpServer
+	var server HttpServer
 	http.Handle("/api/feeds", server)
 
 	var newsListServer NewsListServer

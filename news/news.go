@@ -1,7 +1,5 @@
 package news
 
-
-
 func init() {
 
 }
@@ -14,6 +12,7 @@ type Site struct {
 }
 type News struct {
 	Id          int64
+	FeedId      int64
 	Title       string
 	Url         string
 	Description string

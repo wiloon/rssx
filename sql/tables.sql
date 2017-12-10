@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS `feed` (
 DROP TABLE IF EXISTS `news`;
 CREATE TABLE IF NOT EXISTS `news` (
   `news_id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `feed_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `feed_id` bigint(20) DEFAULT NULL,
   `title` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `url` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `description` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS `news` (
   `guid` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`news_id`),
   KEY `guid` (`guid`(191))
-) ENGINE=InnoDB AUTO_INCREMENT=234 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=283 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 -- Dumping structure for table rssx.news_read_mark
