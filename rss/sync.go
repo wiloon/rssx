@@ -10,10 +10,11 @@ import (
 	"wiloon.com/rssx/feed"
 	"time"
 	"strings"
+	"github.com/wiloon/app-config"
 )
 
 func Sync() {
-	period := time.Duration(time.Second * 60)
+	period := time.Duration(time.Minute * time.Duration(config.GetInt("sync.duration")))
 	ticker := time.NewTicker(period)
 	for ; true; <-ticker.C {
 		//find all feeds

@@ -11,6 +11,7 @@ import (
 	"wiloon.com/rssx/news"
 
 	"github.com/wiloon/app-config"
+	"wiloon.com/rssx/rss"
 )
 
 const userId = 0
@@ -63,12 +64,15 @@ func (server NewsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// feeds := []feed.Feed{feed.Feed{Id: 0, Title: "t0", Url: "u0"}, feed.Feed{Id: 1, Title: "t1", Url: "u1"}}
 	r.ParseForm();
 	newsId, _ := strconv.Atoi(r.Form.Get("id"))
+
 	news := data.FindNews(newsId)
+	log.Info("show news:", news.Title)
 
 	//mark  as read
 	data.MarkNewsRead(userId, newsId)
 	jsonStr, _ := json.Marshal(news)
 	w.Write([]byte(jsonStr))
+
 }
 
 const port = "3000"
@@ -77,7 +81,7 @@ func main() {
 	log.Info("server starting...")
 
 	//start rss sync
-	//go rss.Sync()
+	go rss.Sync()
 
 	dir := config.GetString("client.dir", "")
 	log.Info("client dir:", dir)
