@@ -32,14 +32,15 @@ func FindUserFeeds(userId int) []feed.Feed {
 
 func FindAllNewsForUser(userId int) []news.News {
 	stmt := `
-SELECT nrm.news_id AS unread_news_id,n.news_id,n.title,n.url,n.description  from news n
-JOIN user_feed uf ON uf.user_id=? AND n.feed_id=uf.feed_id
-LEFT JOIN news_read_mark nrm ON nrm.user_id=? and n.news_id=nrm.news_id
-where nrm.news_id IS NULL
+SELECT n.news_id,n.title,n.url,n.description,n.feed_id
+FROM news n
+JOIN user_feed uf ON n.feed_id=uf.feed_id
+LEFT JOIN news_read_mark nrm ON n.news_id = nrm.news_id
+WHERE uf.user_id=? AND nrm.news_id IS NULL
 ORDER BY n.news_id
 `
 
-	result := rssx.Find(stmt, []interface{}{userId, userId}...)
+	result := rssx.Find(stmt, []interface{}{userId}...)
 	var newsList []news.News
 	for _, v := range result {
 		newsList = append(newsList, news.News{Id: v["news_id"].(int64),
@@ -133,12 +134,12 @@ func FindNextNews(userId, newsId int) news.News {
 	var newsRtn news.News
 
 	stmt := `
-SELECT n.news_id,nrm.news_id
+SELECT n.news_id
 FROM news n
 JOIN user_feed uf ON n.feed_id=uf.feed_id
 LEFT JOIN news_read_mark nrm ON n.news_id = nrm.news_id
 WHERE uf.user_id=? AND nrm.news_id IS NULL AND n.news_id!=?
-ORDER BY n.news_id
+ORDER BY n.news_id limit 1
 
 `
 	result := rssx.Find(stmt, []interface{}{userId, newsId}...)
