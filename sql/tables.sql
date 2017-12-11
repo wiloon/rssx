@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS `news` (
   `guid` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`news_id`),
   KEY `guid` (`guid`(191))
-) ENGINE=InnoDB AUTO_INCREMENT=283 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=293 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data exporting was unselected.
 -- Dumping structure for table rssx.news_read_mark
