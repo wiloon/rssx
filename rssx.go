@@ -39,15 +39,15 @@ func (server NewsListServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// feeds := []feed.Feed{feed.Feed{Id: 0, Title: "t0", Url: "u0"}, feed.Feed{Id: 1, Title: "t1", Url: "u1"}}
 	r.ParseForm();
-	id, _ := strconv.Atoi(r.Form.Get("id"))
+	feedId, _ := strconv.Atoi(r.Form.Get("id"))
 
 	var newsList []news.News
-	if id == -1 {
+	if feedId == -1 {
 		// find all news for all user feeds
 		newsList = data.FindAllNewsForUser(userId)
 	} else {
 		// by feed id
-		newsList = data.FindNewsListByUserFeed(userId, id)
+		newsList = data.FindNewsListByUserFeed(userId, feedId)
 	}
 
 	jsonStr, _ := json.Marshal(newsList)

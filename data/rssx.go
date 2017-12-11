@@ -32,7 +32,7 @@ func FindUserFeeds(userId int) []feed.Feed {
 
 func FindAllNewsForUser(userId int) []news.News {
 	stmt := `
-SELECT n.news_id,n.title,n.url,n.description,n.feed_id
+SELECT n.news_id,n.title,'-1' as feed_id
 FROM news n
 JOIN user_feed uf ON n.feed_id=uf.feed_id
 LEFT JOIN news_read_mark nrm ON n.news_id = nrm.news_id
