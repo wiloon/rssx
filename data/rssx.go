@@ -32,7 +32,7 @@ func FindUserFeeds(userId int) []feed.Feed {
 
 func FindAllNewsForUser(userId int) []news.News {
 	stmt := `
-SELECT n.news_id,n.title,'-1' as feed_id
+SELECT n.news_id,n.title,-1 as feed_id
 FROM news n
 JOIN user_feed uf ON n.feed_id=uf.feed_id
 LEFT JOIN news_read_mark nrm ON n.news_id = nrm.news_id
@@ -43,11 +43,10 @@ ORDER BY n.news_id
 	result := rssx.Find(stmt, []interface{}{userId}...)
 	var newsList []news.News
 	for _, v := range result {
-		newsList = append(newsList, news.News{Id: v["news_id"].(int64),
-			Title: string(v["title"].([]uint8)),
-			Url: string(v["url"].([]uint8)),
-			Description: string(v["description"].([]uint8)),
-			FeedId: v["feed_id"].(int64),
+		newsList = append(newsList, news.News{
+			Id:          v["news_id"].(int64),
+			Title:       string(v["title"].([]uint8)),
+			FeedId:      v["feed_id"].(int64),
 		})
 	}
 	return newsList

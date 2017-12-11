@@ -24,7 +24,7 @@ INSERT INTO `feed` (`feed_id`, `title`, `url`, `deleted`) VALUES
 	(6, 'Leica', 'http://www.leica.org.cn/feed.php', 0),
 	(7, 'Engadget', 'http://cn.engadget.com/rss.xml', 0),
 	(8, 'Infozm', 'http://feed43.com/infzmnews.xml', 0),
-	(9, 'huxu', 'https://www.huxiu.com/rss/0.xml', 0),
+	(9, 'huxiu', 'https://www.huxiu.com/rss/0.xml', 0),
 	(10, '36ke', 'http://www.36kr.com/feed', 0),
 	(11, 'FT', 'http://www.ftchinese.com/rss/news', 0);
 /*!40000 ALTER TABLE `feed` ENABLE KEYS */;
