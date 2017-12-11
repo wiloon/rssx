@@ -72,10 +72,12 @@ func (server NewsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		next := news.News{}
 		if feedId == -1 {
 			next = data.FindNextNews(userId, newsId)
+			thisNews.FeedId = -1
 		} else {
 			next = data.FindNextNewsByFeed(userId, feedId, newsId)
 		}
 		thisNews.NextId = next.Id
+
 		log.Info("show news:", thisNews.Title, ", next:", thisNews.NextId)
 
 		//mark  as read
