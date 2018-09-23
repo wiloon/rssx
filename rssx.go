@@ -1,12 +1,11 @@
 package main
 
 import (
-	"net/http"
 	"encoding/json"
-	"wiloon.com/rssx/data"
-	"strconv"
 	"github.com/wiloon/wiloon-log/log"
-	//"wiloon.com/rssx/rss"
+	"net/http"
+	"strconv"
+	"wiloon.com/rssx/data"
 	"wiloon.com/rssx/feed"
 	"wiloon.com/rssx/news"
 
@@ -58,6 +57,8 @@ func (server NewsListServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type NewsServer struct {
 }
 
+var cachedNextNews news.News
+
 // show news
 func (server NewsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
@@ -66,32 +67,48 @@ func (server NewsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	newsId, _ := strconv.Atoi(r.Form.Get("id"))
 	feedId, _ := strconv.Atoi(r.Form.Get("feedId"))
 
-	thisNews := data.FindNews(newsId)
+	newsId64 := int64(newsId)
 
-	if thisNews.Id != 0 {
-		next := news.News{}
-		if feedId == -1 {
-			next = data.FindNextNews(userId, newsId)
-			thisNews.FeedId = -1
-		} else {
-			next = data.FindNextNewsByFeed(userId, feedId, newsId)
-		}
-		thisNews.NextId = next.Id
-
-		log.Info("show news:", thisNews.Title, ", next:", thisNews.NextId)
-
-		//mark  as read
-		data.MarkNewsRead(userId, newsId)
-		jsonStr, _ := json.Marshal(thisNews)
-		w.Write([]byte(jsonStr))
+	thisNews := news.News{}
+	if cachedNextNews.Id == newsId64 {
+		thisNews = cachedNextNews
+	} else {
+		thisNews = loadNews(feedId, newsId64)
 	}
 
+	log.Info("show news:", thisNews.Title, ", next:", thisNews.NextId)
+
+	//mark  as read
+	data.MarkNewsRead(userId, thisNews.Id)
+	jsonStr, _ := json.Marshal(thisNews)
+	w.Write([]byte(jsonStr))
+
+	go loadNextNews(feedId, thisNews.NextId)
+
+}
+
+func loadNextNews(feedId int, nextNewsId int64) {
+	cachedNextNews = loadNews(feedId, nextNewsId)
+}
+
+func loadNews(feedId int, newsId int64) news.News {
+	thisNews := data.FindNews(newsId)
+	next := news.News{}
+	if feedId == -1 {
+		next = data.FindNextNews(userId, newsId)
+		thisNews.FeedId = -1
+	} else {
+		next = data.FindNextNewsByFeed(userId, feedId, newsId)
+	}
+	thisNews.NextId = next.Id
+
+	return thisNews
 }
 
 const port = "3000"
 
 func main() {
-	log.Info("server starting...")
+	log.Info("rssx starting...")
 
 	//start rss sync
 	go rss.Sync()

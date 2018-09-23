@@ -74,7 +74,7 @@ ORDER BY n.news_id
 	return newsList
 }
 
-func FindNextNewsByFeed(userId, feedId int, newsId int) news.News {
+func FindNextNewsByFeed(userId, feedId int, newsId int64) news.News {
 	var newsRtn news.News
 
 	stmt := `
@@ -103,7 +103,7 @@ ORDER BY n.news_id  limit 1
 	return newsRtn
 }
 
-func FindNews(newsId int) news.News {
+func FindNews(newsId int64) news.News {
 	var newsRtn news.News
 
 	stmt := `
@@ -129,7 +129,7 @@ select * from news where news_id=?
 	return newsRtn
 }
 
-func FindNextNews(userId, newsId int) news.News {
+func FindNextNews(userId, newsId int64) news.News {
 	var newsRtn news.News
 
 	stmt := `
@@ -178,7 +178,7 @@ func FindFeeds() []feed.Feed {
 	return feeds
 }
 
-func MarkNewsRead(userId, newsId int) {
+func MarkNewsRead(userId, newsId int64) {
 	stmt := "INSERT news_read_mark SET  user_id=?,news_id=?"
 	rssx.Save(stmt, []interface{}{userId, newsId}...)
 }
