@@ -6,18 +6,30 @@ func init() {
 
 var bucket = "NewsBucket"
 
+const (
+	NewsId      = "Id"
+	FeedId      = "FeedId"
+	Title       = "Title"
+	Url         = "Url"
+	Description = "Description"
+	NextNewsId  = "NextId"
+	PubDate     = "PubDate"
+	Guid        = "Guid"
+)
+
 type Site struct {
 	Title    string
 	NewsList []News
 }
 type News struct {
-	Id          int64
+	Id          string
 	FeedId      int64
 	Title       string
 	Url         string
 	Description string
-	NextId      int64
+	NextId      string
 	PubDate     string
+	Guid        string
 }
 
 func (site *Site) Append(title, url, description string) {
