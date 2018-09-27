@@ -8,6 +8,7 @@ import (
 	"wiloon.com/rssx/data"
 	"wiloon.com/rssx/feed"
 	"wiloon.com/rssx/news"
+	"wiloon.com/rssx/storage/redisx"
 
 	"github.com/wiloon/app-config"
 	"wiloon.com/rssx/rss"
@@ -46,7 +47,7 @@ func (server NewsListServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		newsList = data.FindAllNewsForUser(userId)
 	} else {
 		// by feed id
-		newsList = data.FindNewsListByUserFeed(userId, feedId)
+		newsList = redisx.FindNewsListByUserFeed(userId, feedId)
 	}
 
 	jsonStr, _ := json.Marshal(newsList)
@@ -64,43 +65,34 @@ func (server NewsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// feeds := []feed.Feed{feed.Feed{Id: 0, Title: "t0", Url: "u0"}, feed.Feed{Id: 1, Title: "t1", Url: "u1"}}
 	r.ParseForm();
-	newsId, _ := strconv.Atoi(r.Form.Get("id"))
+	newsId := r.Form.Get("id")
 	feedId, _ := strconv.Atoi(r.Form.Get("feedId"))
 
-	newsId64 := int64(newsId)
-
 	thisNews := news.News{}
-	if cachedNextNews.Id == newsId64 {
-		thisNews = cachedNextNews
-	} else {
-		thisNews = loadNews(feedId, newsId64)
-	}
+
+	thisNews = loadNews(feedId, newsId)
 
 	log.Info("show news:", thisNews.Title, ", next:", thisNews.NextId)
 
 	//mark  as read
-	data.MarkNewsRead(userId, thisNews.Id)
+	//data.MarkNewsRead(userId, thisNews.Id)
 	jsonStr, _ := json.Marshal(thisNews)
 	w.Write([]byte(jsonStr))
 
-	go loadNextNews(feedId, thisNews.NextId)
+	//go loadNextNews(feedId, thisNews.NextId)
 
 }
 
-func loadNextNews(feedId int, nextNewsId int64) {
-	cachedNextNews = loadNews(feedId, nextNewsId)
-}
-
-func loadNews(feedId int, newsId int64) news.News {
-	thisNews := data.FindNews(newsId)
-	next := news.News{}
-	if feedId == -1 {
-		next = data.FindNextNews(userId, newsId)
-		thisNews.FeedId = -1
-	} else {
-		next = data.FindNextNewsByFeed(userId, feedId, newsId)
-	}
-	thisNews.NextId = next.Id
+func loadNews(feedId int, newsId string) news.News {
+	log.Info("find news:" + newsId)
+	thisNews := redisx.FindNews(newsId)
+	log.Info("news:" + thisNews.Title)
+	//next := news.News{}
+	//if feedId == -1 {
+	//	next = data.FindNextNews(userId, newsId)
+	//	thisNews.FeedId = -1
+	//}
+	//thisNews.NextId = next.Id
 
 	return thisNews
 }

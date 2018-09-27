@@ -1,6 +1,8 @@
 package rss
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestSync(t *testing.T) {
 	Sync()
