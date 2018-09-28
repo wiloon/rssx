@@ -87,6 +87,9 @@ func loadNews(feedId int, newsId string) news.News {
 	log.Info("find news:" + newsId)
 	thisNews := redisx.FindNews(newsId)
 	log.Info("news:" + thisNews.Title)
+
+	nextNewsId:=redisx.FindNextNewsId(feedId,newsId)
+	thisNews.NextId=nextNewsId
 	//next := news.News{}
 	//if feedId == -1 {
 	//	next = data.FindNextNews(userId, newsId)

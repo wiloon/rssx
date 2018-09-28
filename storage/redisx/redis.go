@@ -76,6 +76,19 @@ func FindNews(newsId string) news.News {
 		Title:       string(result[0].([]byte)),
 		Url:         string(result[1].([]byte)),
 		Description: string(result[2].([]byte)),
-
 	}
+}
+
+func FindNextNewsId(feedId int, newsId string) string {
+	var nextNewsId string
+	result, err := conn.Do("ZRANK", feedNewsKeyPrefix+strconv.Itoa(feedId), newsId)
+	if err != nil {
+		log.Info(err.Error())
+	}
+
+	nextIndex := result.(int64) + 1
+	foo, _ := conn.Do("ZRANGE", feedNewsKeyPrefix+strconv.Itoa(feedId), nextIndex, nextIndex)
+	nextNewsId = string(foo.([]interface{})[0].([]byte))
+
+	return nextNewsId
 }
