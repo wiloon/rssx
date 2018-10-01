@@ -47,3 +47,11 @@ func TestMd5(t *testing.T) {
 	fmt.Println(md5str1)
 
 }
+
+func TestSaveReadSet(t *testing.T) {
+	SaveReadMark(0, 0, "d033b8dfe091ef0262bd54dcb49bc04e")
+}
+
+func TestGetReadMark(t *testing.T) {
+	SaveReadMark(0, 0, "d033b8dfe091ef0262bd54dcb49bc04e")
+}

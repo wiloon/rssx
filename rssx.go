@@ -2,15 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/wiloon/app-config"
 	"github.com/wiloon/wiloon-log/log"
 	"net/http"
 	"strconv"
 	"wiloon.com/rssx/data"
 	"wiloon.com/rssx/feed"
+	"wiloon.com/rssx/feed/news/list"
 	"wiloon.com/rssx/news"
-	"wiloon.com/rssx/storage/redisx"
-
-	"github.com/wiloon/app-config"
 	"wiloon.com/rssx/rss"
 )
 
@@ -19,9 +18,9 @@ const userId = 0
 type HttpServer struct {
 }
 
-// user feeds
+// user feed list
 func (server HttpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
+	log.Debug("load user feed list")
 	feeds := []feed.Feed{{Id: -1, Title: "All", Url: ""}}
 
 	feeds = append(feeds, data.FindUserFeeds(userId)...)
@@ -34,11 +33,11 @@ func (server HttpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type NewsListServer struct {
 }
 
-// news list by feed
+// load news list by feed
 func (server NewsListServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// feeds := []feed.Feed{feed.Feed{Id: 0, Title: "t0", Url: "u0"}, feed.Feed{Id: 1, Title: "t1", Url: "u1"}}
-	r.ParseForm();
+	r.ParseForm()
 	feedId, _ := strconv.Atoi(r.Form.Get("id"))
 
 	var newsList []news.News
@@ -47,7 +46,15 @@ func (server NewsListServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		newsList = data.FindAllNewsForUser(userId)
 	} else {
 		// by feed id
-		newsList = redisx.FindNewsListByUserFeed(userId, feedId)
+		newsIds := list.FindNewsListByUserFeed(userId, feedId)
+		for _, v := range newsIds {
+			n := news.New(v)
+			n.LoadTitle()
+			n.LoadReadFlag(0)
+
+			newsList = append(newsList, *n)
+
+		}
 	}
 
 	jsonStr, _ := json.Marshal(newsList)
@@ -62,34 +69,33 @@ var cachedNextNews news.News
 
 // show news
 func (server NewsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
+	log.Debug("load news")
 	// feeds := []feed.Feed{feed.Feed{Id: 0, Title: "t0", Url: "u0"}, feed.Feed{Id: 1, Title: "t1", Url: "u1"}}
-	r.ParseForm();
+	r.ParseForm()
 	newsId := r.Form.Get("id")
 	feedId, _ := strconv.Atoi(r.Form.Get("feedId"))
+	log.Debugf("feed id:%v, news id:%v", feedId, newsId)
 
-	thisNews := news.News{}
+	feed.NewFeed(feedId)
 
-	thisNews = loadNews(feedId, newsId)
+	thisNews := loadNews(feedId, newsId)
 
 	log.Info("show news:", thisNews.Title, ", next:", thisNews.NextId)
+	thisNews.MarkRead(0)
 
-	//mark  as read
-	//data.MarkNewsRead(userId, thisNews.Id)
 	jsonStr, _ := json.Marshal(thisNews)
 	w.Write([]byte(jsonStr))
-
-	//go loadNextNews(feedId, thisNews.NextId)
 
 }
 
 func loadNews(feedId int, newsId string) news.News {
 	log.Info("find news:" + newsId)
-	thisNews := redisx.FindNews(newsId)
+	thisNews := news.New(newsId)
+	thisNews.Load()
 	log.Info("news:" + thisNews.Title)
 
-	nextNewsId:=redisx.FindNextNewsId(feedId,newsId)
-	thisNews.NextId=nextNewsId
+	nextNewsId := list.FindNextId(feedId, newsId)
+	thisNews.NextId = nextNewsId
 	//next := news.News{}
 	//if feedId == -1 {
 	//	next = data.FindNextNews(userId, newsId)
@@ -97,7 +103,7 @@ func loadNews(feedId int, newsId string) news.News {
 	//}
 	//thisNews.NextId = next.Id
 
-	return thisNews
+	return *thisNews
 }
 
 const port = "3000"
