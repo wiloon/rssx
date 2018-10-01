@@ -7,15 +7,19 @@ import (
 	"github.com/wiloon/wiloon-log/log"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"wiloon.com/rssx/data"
 	"wiloon.com/rssx/feed"
-	"wiloon.com/rssx/storage/redisx"
+	"wiloon.com/rssx/feed/news/list"
+	"wiloon.com/rssx/news"
+	"wiloon.com/rssx/utils"
 )
 
 func Sync() {
 	syncNews := config.GetBool("syncNews")
+	log.Debug("sync:" + strconv.FormatBool(syncNews))
 	duration := time.Duration(time.Minute * time.Duration(config.GetInt("sync.duration")))
 	ticker := time.NewTicker(duration)
 	for ; syncNews; <-ticker.C {
@@ -57,20 +61,25 @@ func SyncFeed(feed feed.Feed) {
 	for i, v := range v.Chan.Items {
 		// compare and save
 
-		log.Info("index:", i, ", title:", string(v.Title)) //todo infof
-
 		url := v.Link
-		pubDate, _ := time.Parse(time.RFC1123Z, v.PubDate)
 		guid := v.Guid
+
+		log.Infof("index:%v, title:%v, guid:%v", i, string(v.Title), guid)
+
 		if strings.EqualFold(guid, "") {
 			guid = v.Link
 		}
-		//check if guid is exist
-		found := data.FindNewsByGuid(guid)
-		exist := len(found) == 1
 
-		if !exist {
-			redisx.SaveNews(feed.Id, v.Title, url, v.Description, pubDate, guid)
-		}
+		newsList := list.NewList(0, feed)
+
+		// since duplicate pub date, and invalid pub date, set time.now() as score, make sure no duplicate score
+		score := time.Now().UnixNano()
+
+		newsId := utils.Md5(guid)
+		newsList.AppendNews(score, newsId) //todo, check if exist
+		log.Debugf("score:%v, news id:%v", score, newsId)
+		oneNews := news.News{Id: newsId, FeedId: int64(feed.Id), Guid: guid, Score: score, Title: v.Title, Description: v.Description, Url: url, PubDate: v.PubDate}
+		oneNews.Save()
+
 	}
 }
