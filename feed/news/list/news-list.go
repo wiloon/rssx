@@ -95,3 +95,15 @@ func SetReadIndex(userId, feedId int, score int64) {
 	redisx.Conn.Do("SET", userFeedLatestReadIndex+strconv.Itoa(userId)+":"+strconv.Itoa(feedId), score)
 	log.Debugf("reset read index, index:%v", score)
 }
+
+func FindIndexById(feedId int, newsId string) int64 {
+	var index int64
+	result, err := redisx.Conn.Do("ZRANK", FeedNewsKeyPrefix+strconv.Itoa(feedId), newsId)
+	if err != nil {
+		log.Info(err.Error())
+	}
+
+	index = result.(int64)
+
+	return index
+}

@@ -71,8 +71,6 @@ func loadNewsListByFeed(feedId int) []news.News {
 type NewsServer struct {
 }
 
-var cachedNextNews news.News
-
 // load news
 func (server NewsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
@@ -82,18 +80,40 @@ func (server NewsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	feed.NewFeed(feedId)
 
-	thisNews := news.New(newsId)
-	thisNews.FeedId = int64(feedId)
-	thisNews.Load()
-	log.Info("news:" + thisNews.Title)
+	n := news.New(newsId)
+	n.FeedId = int64(feedId)
+	n.Load()
+	log.Info("news:" + n.Title)
 
 	nextNewsId := list.FindNextId(feedId, newsId)
-	thisNews.NextId = nextNewsId
+	n.NextId = nextNewsId
 
-	log.Info("show news:", thisNews.Title, ", next:", thisNews.NextId)
-	thisNews.MarkRead(0)
+	log.Info("show news:", n.Title, ", next:", n.NextId)
+	n.MarkRead(0)
 
-	jsonStr, _ := json.Marshal(thisNews)
+	jsonStr, _ := json.Marshal(n)
+	w.Write([]byte(jsonStr))
+}
+
+type PreviousNewsServer struct {
+}
+
+// load previous news
+func (server PreviousNewsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	currentNewsId := r.Form.Get("currentId")
+	feedId, _ := strconv.Atoi(r.Form.Get("feedId"))
+	log.Debugf(" load previous news feed id:%v, news id:%v", feedId, currentNewsId)
+	index := list.FindIndexById(feedId, currentNewsId)
+	newsIds := list.FindNewsListByRange(list.NewsListKey(feedId), index-1, index-1)
+	previousNewsId := newsIds[0]
+	n := news.New(previousNewsId)
+	n.FeedId = int64(feedId)
+	n.Load()
+	nextNewsId := list.FindNextId(feedId, previousNewsId)
+	n.NextId = nextNewsId
+
+	jsonStr, _ := json.Marshal(n)
 	w.Write([]byte(jsonStr))
 }
 
@@ -140,11 +160,14 @@ func main() {
 
 	var newsServer NewsServer
 	http.Handle("/api/news", newsServer)
-	log.Info("rssx server listening:", port)
+
+	var previousNewsServer PreviousNewsServer
+	http.Handle("/api/news-previous", previousNewsServer)
 
 	var markReadServer MarkReadServer
 	http.Handle("/api/mark-read", markReadServer)
 
+	log.Info("rssx server listening:", port)
 	err := http.ListenAndServe(":"+port, nil)
 	handleErr(err)
 }
