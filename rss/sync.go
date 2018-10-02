@@ -7,7 +7,6 @@ import (
 	"github.com/wiloon/wiloon-log/log"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 	"wiloon.com/rssx/data"
@@ -18,11 +17,10 @@ import (
 )
 
 func Sync() {
-	syncNews := config.GetBool("syncNews")
-	log.Debug("sync:" + strconv.FormatBool(syncNews))
+
 	duration := time.Duration(time.Minute * time.Duration(config.GetInt("sync.duration")))
 	ticker := time.NewTicker(duration)
-	for ; syncNews; <-ticker.C {
+	for ; true; <-ticker.C {
 		//find all feeds
 		feeds := data.FindFeeds()
 		for _, feed := range feeds {

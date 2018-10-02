@@ -2,9 +2,9 @@ package news
 
 import (
 	"github.com/garyburd/redigo/redis"
+	"github.com/wiloon/wiloon-log/log"
 	"strconv"
 	"wiloon.com/rssx/storage/redisx"
-	"wiloon.com/wiloon-log/log"
 )
 
 func init() {
@@ -39,7 +39,7 @@ type News struct {
 	PubDate     string
 	Guid        string
 	Score       int64
-	UnRead      bool
+	ReadFlag    bool
 }
 
 func New(newsId string) *News {
@@ -67,15 +67,23 @@ func (n *News) Save() {
 	log.Info("save news:" + n.Title)
 }
 
-const newsReadMark string = "feed_read:"
+// read mark, redis set, value=news id
+const newsReadMark string = "read_mark:"
 
 func (n *News) IsRead(userId int) bool {
-	r, _ := redisx.Conn.Do("SISMEMBER", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(n.FeedId)), n.Id)
-	return r == 1
+	read := false
+	readMarkKey := newsReadMark + strconv.Itoa(userId) + ":" + strconv.Itoa(int(n.FeedId))
+	r, _ := redisx.Conn.Do("SISMEMBER", readMarkKey, n.Id)
+	if r.(int64) == 1 {
+		read = true
+	}
+	log.Debugf("check news is read, read flag key: %v, news id: %v, read flag :%v", readMarkKey, n.Id, read)
+	return read
 }
 
 func (n *News) MarkRead(userId int) {
 	redisx.Conn.Do("SADD", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(n.FeedId)), n.Id)
+	log.Debugf("mark news as read, news id: %v", n.Id)
 }
 
 const newsKeyPrefix string = "news:"
@@ -85,8 +93,10 @@ func (n *News) LoadTitle() {
 	n.Title = string(result[0].([]byte))
 }
 func (n *News) LoadReadFlag(userId int) {
-	n.UnRead = !n.IsRead(userId)
 
+	n.ReadFlag = n.IsRead(0)
+
+	log.Debugf("read mark, news id: %v, title: %v", n.Id, n.Title)
 }
 func (n *News) Load() {
 	result, err := redis.Values(redisx.Conn.Do("HMGET", newsKeyPrefix+n.Id, Title, Url, Description, Score))
@@ -100,4 +110,8 @@ func (n *News) Load() {
 	score, _ := strconv.Atoi(string(result[3].([]byte)))
 	n.Score = int64(score)
 
+}
+
+func DelReadMark(userId, feedId int) {
+	redisx.Conn.Do("DEL", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(feedId)))
 }
