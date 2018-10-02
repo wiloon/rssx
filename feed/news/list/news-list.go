@@ -1,13 +1,14 @@
 package list
 
 import (
+	"github.com/wiloon/wiloon-log/log"
 	"strconv"
 	"wiloon.com/rssx/feed"
 	"wiloon.com/rssx/storage/redisx"
-	"wiloon.com/wiloon-log/log"
 )
 
 const FeedNewsKeyPrefix string = "feed_news:"
+const PageSize int64 = 10
 
 type NewsList struct {
 	userId int
@@ -27,7 +28,23 @@ func (newsList *NewsList) AppendNews(score int64, newsId string) {
 
 func FindNewsListByUserFeed(userId, feedId int) []string {
 	var newsList []string
-	result, err := redisx.Conn.Do("ZRANGE", FeedNewsKeyPrefix+strconv.Itoa(feedId), 0, 9)
+
+	latestReadIndex := GetLatestReadIndex(userId, feedId)
+	key := NewsListKey(feedId)
+
+	newsList = FindNewsListByRange(key, latestReadIndex, latestReadIndex+PageSize-1)
+	log.Infof("find news list by feed,read index: %v, news size: %v", latestReadIndex, len(newsList))
+	return newsList
+}
+
+func NewsListKey(feedId int) string {
+	return FeedNewsKeyPrefix + strconv.Itoa(feedId)
+}
+
+func FindNewsListByRange(key string, start, end int64) []string {
+	var newsidList []string
+
+	result, err := redisx.Conn.Do("ZRANGE", key, start, end)
 	if err != nil {
 		log.Info("failed to get news")
 	}
@@ -35,20 +52,9 @@ func FindNewsListByUserFeed(userId, feedId int) []string {
 		b := v.([]byte)
 		newsId := string(b)
 		log.Info("news id: " + newsId)
-		//n, _ := redis.Values(Conn.Do("HGETALL", newsKeyPrefix+newsId))
-		//n, _ := redis.Values(redisx.Conn.Do("HMGET", newsKeyPrefix+newsId, news.Title))
-		//title := string(n[0].([]byte))
-
-		//var foo news.News
-		//for _, v := range n {
-		//	fmt.Printf("%s ", v.([]byte))
-		//}
-		//fmt.Printf("\n")
-		newsList = append(newsList, newsId)
-		//log.Info("news list item:" + title)
+		newsidList = append(newsidList, newsId)
 	}
-	log.Info("find news list by feed,news size:" + string(len(newsList)))
-	return newsList
+	return newsidList
 }
 
 func FindNextId(feedId int, newsId string) string {
@@ -63,4 +69,29 @@ func FindNextId(feedId int, newsId string) string {
 	nextNewsId = string(foo.([]interface{})[0].([]byte))
 
 	return nextNewsId
+}
+
+// news list read index, value=sorted set range index, not score
+const userFeedLatestReadIndex string = "read_index:"
+
+func GetLatestReadIndex(userId, feedId int) int64 {
+	result := 0
+	readIndexKey := userFeedLatestReadIndex + strconv.Itoa(userId) + ":" + strconv.Itoa(feedId)
+	r, err := redisx.Conn.Do("GET", readIndexKey)
+	if err != nil {
+		log.Info(err.Error())
+	}
+	if r != nil {
+		b := r.([]byte)
+		i := string(b)
+		result, _ = strconv.Atoi(i)
+	}
+	log.Debugf("latest read index: %v", result)
+	return int64(result)
+}
+
+func SetReadIndex(userId, feedId int, score int64) {
+
+	redisx.Conn.Do("SET", userFeedLatestReadIndex+strconv.Itoa(userId)+":"+strconv.Itoa(feedId), score)
+	log.Debugf("reset read index, index:%v", score)
 }

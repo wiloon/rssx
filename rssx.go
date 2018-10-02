@@ -10,7 +10,6 @@ import (
 	"wiloon.com/rssx/feed"
 	"wiloon.com/rssx/feed/news/list"
 	"wiloon.com/rssx/news"
-	"wiloon.com/rssx/rss"
 )
 
 const userId = 0
@@ -36,10 +35,18 @@ type NewsListServer struct {
 // load news list by feed
 func (server NewsListServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	// feeds := []feed.Feed{feed.Feed{Id: 0, Title: "t0", Url: "u0"}, feed.Feed{Id: 1, Title: "t1", Url: "u1"}}
 	r.ParseForm()
 	feedId, _ := strconv.Atoi(r.Form.Get("id"))
+	log.Debugf("load news list by feed id: %v", feedId)
 
+	newsList := loadNewsListByFeed(feedId)
+
+	jsonStr, _ := json.Marshal(newsList)
+
+	w.Write([]byte(jsonStr))
+}
+
+func loadNewsListByFeed(feedId int) []news.News {
 	var newsList []news.News
 	if feedId == -1 {
 		// find all news for all user feeds
@@ -49,17 +56,16 @@ func (server NewsListServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		newsIds := list.FindNewsListByUserFeed(userId, feedId)
 		for _, v := range newsIds {
 			n := news.New(v)
+			n.FeedId = int64(feedId)
 			n.LoadTitle()
 			n.LoadReadFlag(0)
 
 			newsList = append(newsList, *n)
-
+			log.Debugf("append article: %v", n.Title)
 		}
 	}
-
-	jsonStr, _ := json.Marshal(newsList)
-
-	w.Write([]byte(jsonStr))
+	log.Debugf("new list size: %v", len(newsList))
+	return newsList
 }
 
 type NewsServer struct {
@@ -67,43 +73,51 @@ type NewsServer struct {
 
 var cachedNextNews news.News
 
-// show news
+// load news
 func (server NewsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Debug("load news")
-	// feeds := []feed.Feed{feed.Feed{Id: 0, Title: "t0", Url: "u0"}, feed.Feed{Id: 1, Title: "t1", Url: "u1"}}
 	r.ParseForm()
 	newsId := r.Form.Get("id")
 	feedId, _ := strconv.Atoi(r.Form.Get("feedId"))
-	log.Debugf("feed id:%v, news id:%v", feedId, newsId)
+	log.Debugf(" load news feed id:%v, news id:%v", feedId, newsId)
 
 	feed.NewFeed(feedId)
 
-	thisNews := loadNews(feedId, newsId)
+	thisNews := news.New(newsId)
+	thisNews.FeedId = int64(feedId)
+	thisNews.Load()
+	log.Info("news:" + thisNews.Title)
+
+	nextNewsId := list.FindNextId(feedId, newsId)
+	thisNews.NextId = nextNewsId
 
 	log.Info("show news:", thisNews.Title, ", next:", thisNews.NextId)
 	thisNews.MarkRead(0)
 
 	jsonStr, _ := json.Marshal(thisNews)
 	w.Write([]byte(jsonStr))
-
 }
 
-func loadNews(feedId int, newsId string) news.News {
-	log.Info("find news:" + newsId)
-	thisNews := news.New(newsId)
-	thisNews.Load()
-	log.Info("news:" + thisNews.Title)
+type MarkReadServer struct {
+}
 
-	nextNewsId := list.FindNextId(feedId, newsId)
-	thisNews.NextId = nextNewsId
-	//next := news.News{}
-	//if feedId == -1 {
-	//	next = data.FindNextNews(userId, newsId)
-	//	thisNews.FeedId = -1
-	//}
-	//thisNews.NextId = next.Id
+// mark page as read
+func (server MarkReadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	feedId, _ := strconv.Atoi(r.Form.Get("feedId"))
+	log.Debugf("mark read, feed id: %v", feedId)
 
-	return *thisNews
+	readIndex := list.GetLatestReadIndex(userId, feedId)
+	// reset read index
+	newIndex := readIndex + list.PageSize
+	list.SetReadIndex(0, feedId, newIndex)
+	log.Debugf("set read index:  %v", newIndex)
+	// del read mark set
+	news.DelReadMark(0, feedId)
+
+	// load next page
+	newsList := loadNewsListByFeed(feedId)
+	jsonStr, _ := json.Marshal(newsList)
+	w.Write([]byte(jsonStr))
 }
 
 const port = "3000"
@@ -112,7 +126,7 @@ func main() {
 	log.Info("rssx starting...")
 
 	//start rss sync
-	go rss.Sync()
+	//go rss.Sync()
 
 	dir := config.GetString("client.dir", "")
 	log.Info("client dir:", dir)
@@ -126,7 +140,17 @@ func main() {
 
 	var newsServer NewsServer
 	http.Handle("/api/news", newsServer)
-	log.Info("rssx listening:", port)
+	log.Info("rssx server listening:", port)
 
-	http.ListenAndServe(":"+port, nil)
+	var markReadServer MarkReadServer
+	http.Handle("/api/mark-read", markReadServer)
+
+	err := http.ListenAndServe(":"+port, nil)
+	handleErr(err)
+}
+
+func handleErr(e error) {
+	if e != nil {
+		log.Error(e.Error())
+	}
 }

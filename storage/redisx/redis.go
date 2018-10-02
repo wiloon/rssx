@@ -2,13 +2,10 @@ package redisx
 
 import (
 	"github.com/garyburd/redigo/redis"
-	"strconv"
-	"wiloon.com/wiloon-log/log"
+	"github.com/wiloon/wiloon-log/log"
 )
 
 var Conn redis.Conn
-
-const userFeedLatestReadIndex string = "feed_latest_read_index:"
 
 func init() {
 	var err error
@@ -19,14 +16,14 @@ func init() {
 
 }
 
-func GetLatestReadIndex(userId, feedId int) string {
-	result, _ := Conn.Do("GET", userFeedLatestReadIndex+strconv.Itoa(userId)+":"+strconv.Itoa(feedId))
-	return result.(string)
-}
-
-func SaveLatestReadIndex(userId, feedId int, score string) {
-	Conn.Do("SET", userFeedLatestReadIndex+strconv.Itoa(userId)+":"+strconv.Itoa(feedId), score)
-}
+//func GetLatestReadIndex(userId, feedId int) string {
+//	result, _ := Conn.Do("GET", userFeedLatestReadIndex+strconv.Itoa(userId)+":"+strconv.Itoa(feedId))
+//	return result.(string)
+//}
+//
+//func SaveLatestReadIndex(userId, feedId int, score string) {
+//	Conn.Do("SET", userFeedLatestReadIndex+strconv.Itoa(userId)+":"+strconv.Itoa(feedId), score)
+//}
 
 //
 //func FindNewsByScore(feedId int, min, max string) {
