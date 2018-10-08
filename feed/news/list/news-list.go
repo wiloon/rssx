@@ -59,16 +59,22 @@ func FindNewsListByRange(key string, start, end int64) []string {
 
 func FindNextId(feedId int, newsId string) string {
 	var nextNewsId string
-	result, err := redisx.Conn.Do("ZRANK", FeedNewsKeyPrefix+strconv.Itoa(feedId), newsId)
-	if err != nil {
-		log.Info(err.Error())
+	index := FindIndexById(feedId, newsId)
+	nextIndex := index + 1
+	foo, _ := redisx.Conn.Do("ZRANGE", feedNewsKey(feedId), nextIndex, nextIndex)
+	if len(foo.([]interface{})) > 0 {
+		nextNewsId = string(foo.([]interface{})[0].([]byte))
+
+	} else {
+		nextNewsId = ""
 	}
-
-	nextIndex := result.(int64) + 1
-	foo, _ := redisx.Conn.Do("ZRANGE", FeedNewsKeyPrefix+strconv.Itoa(feedId), nextIndex, nextIndex)
-	nextNewsId = string(foo.([]interface{})[0].([]byte))
-
 	return nextNewsId
+}
+
+func feedNewsKey(feedId int) string {
+	key := FeedNewsKeyPrefix + strconv.Itoa(feedId)
+	log.Debugf("feed news key: %v", key)
+	return key
 }
 
 // news list read index, value=sorted set range index, not score
@@ -98,14 +104,30 @@ func SetReadIndex(userId, feedId int, score int64) {
 
 func FindIndexById(feedId int, newsId string) int64 {
 	var index int64
-	result, err := redisx.Conn.Do("ZRANK", FeedNewsKeyPrefix+strconv.Itoa(feedId), newsId)
+	result, err := redisx.Conn.Do("ZRANK", feedNewsKey(feedId), newsId)
 	if err != nil {
 		log.Info(err.Error())
 	}
 	if result == nil {
-		index=-1
-	}else{
+		index = -1
+	} else {
 		index = result.(int64)
 	}
+	log.Debugf("find index by id: %v, index: %v", newsId, index)
 	return index
+}
+
+func Count(feedId int) int64 {
+	var count int64
+	result, err := redisx.Conn.Do("ZCARD", feedNewsKey(feedId))
+	if err != nil {
+		log.Info(err.Error())
+	}
+	if result == nil {
+		count = 0
+	} else {
+		count = result.(int64)
+	}
+	log.Debugf("feed: %v, news count: %v", feedId, count)
+	return count
 }

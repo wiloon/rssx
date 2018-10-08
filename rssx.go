@@ -10,6 +10,7 @@ import (
 	"wiloon.com/rssx/feed"
 	"wiloon.com/rssx/feed/news/list"
 	"wiloon.com/rssx/news"
+	"wiloon.com/rssx/rss"
 )
 
 const userId = 0
@@ -21,8 +22,19 @@ type HttpServer struct {
 func (server HttpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Debug("load user feed list")
 	feeds := []feed.Feed{{Id: -1, Title: "All", Url: ""}}
+	tmp := data.FindUserFeeds(userId)
 
-	feeds = append(feeds, data.FindUserFeeds(userId)...)
+	for _, v := range tmp {
+		count := list.Count(int(v.Id))
+		index := list.GetLatestReadIndex(0, int(v.Id))
+		unread := count - index
+		if unread < 0 {
+			unread = 0
+		}
+		v.Title = v.Title + " - " + strconv.Itoa(int(unread))
+
+		feeds = append(feeds, v)
+	}
 
 	jsonStr, _ := json.Marshal(feeds)
 	log.Info("api feeds:", jsonStr)
@@ -59,6 +71,7 @@ func loadNewsListByFeed(feedId int) []news.News {
 			n.FeedId = int64(feedId)
 			n.LoadTitle()
 			n.LoadReadFlag(0)
+			// calculate unread count
 
 			newsList = append(newsList, *n)
 			log.Debugf("append article: %v", n.Title)
@@ -77,8 +90,6 @@ func (server NewsServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	newsId := r.Form.Get("id")
 	feedId, _ := strconv.Atoi(r.Form.Get("feedId"))
 	log.Debugf(" load news feed id:%v, news id:%v", feedId, newsId)
-
-	feed.NewFeed(feedId)
 
 	n := news.New(newsId)
 	n.FeedId = int64(feedId)
@@ -146,7 +157,7 @@ func main() {
 	log.Info("rssx starting...")
 
 	//start rss sync
-	//go rss.Sync()
+	go rss.Sync()
 
 	dir := config.GetString("client.dir", "")
 	log.Info("client dir:", dir)
