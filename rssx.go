@@ -174,6 +174,6 @@ func main() {
 
 func handleErr(e error) {
 	if e != nil {
-		log.Error(e.Error())
+		log.Info(e.Error())
 	}
 }

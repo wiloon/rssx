@@ -102,8 +102,10 @@ func FindIndexById(feedId int, newsId string) int64 {
 	if err != nil {
 		log.Info(err.Error())
 	}
-
-	index = result.(int64)
-
+	if result == nil {
+		index=-1
+	}else{
+		index = result.(int64)
+	}
 	return index
 }
