@@ -10,6 +10,12 @@ func TestReadIndex(t *testing.T) {
 }
 
 func TestNewsExist(t *testing.T) {
-	v:=FindIndexById(0,"da660f185cc89a4a09e2578c65cdbc0")
+	v := FindIndexById(0, "da660f185cc89a4a09e2578c65cdbc0")
+	fmt.Println(v)
+}
+
+func TestCount(t *testing.T) {
+
+	v := Count(0)
 	fmt.Println(v)
 }
