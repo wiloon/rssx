@@ -74,10 +74,12 @@ func SyncFeed(feed feed.Feed) {
 		score := time.Now().UnixNano()
 
 		newsId := utils.Md5(guid)
-		newsList.AppendNews(score, newsId) //todo, check if exist
-		log.Debugf("score:%v, news id:%v", score, newsId)
-		oneNews := news.News{Id: newsId, FeedId: int64(feed.Id), Guid: guid, Score: score, Title: v.Title, Description: v.Description, Url: url, PubDate: v.PubDate}
-		oneNews.Save()
+		if list.FindIndexById(int(feed.Id), newsId) == -1 {
+			newsList.AppendNews(score, newsId)
+			log.Debugf("score:%v, news id:%v", score, newsId)
+			oneNews := news.News{Id: newsId, FeedId: int64(feed.Id), Guid: guid, Score: score, Title: v.Title, Description: v.Description, Url: url, PubDate: v.PubDate}
+			oneNews.Save()
+		}
 
 	}
 }
