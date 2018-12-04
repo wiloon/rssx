@@ -2,9 +2,9 @@ package list
 
 import (
 	"github.com/wiloon/wiloon-log/log"
+	"rssx/feed"
+	"rssx/storage/redisx"
 	"strconv"
-	"wiloon.com/rssx/feed"
-	"wiloon.com/rssx/storage/redisx"
 )
 
 const FeedNewsKeyPrefix string = "feed_news:"

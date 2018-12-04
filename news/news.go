@@ -3,8 +3,8 @@ package news
 import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/wiloon/wiloon-log/log"
+	"rssx/storage/redisx"
 	"strconv"
-	"wiloon.com/rssx/storage/redisx"
 )
 
 func init() {
