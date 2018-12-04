@@ -7,13 +7,13 @@ import (
 	"github.com/wiloon/wiloon-log/log"
 	"io/ioutil"
 	"net/http"
+	"rssx/data"
+	"rssx/feed"
+	"rssx/feed/news/list"
+	"rssx/news"
+	"rssx/utils"
 	"strings"
 	"time"
-	"wiloon.com/rssx/data"
-	"wiloon.com/rssx/feed"
-	"wiloon.com/rssx/feed/news/list"
-	"wiloon.com/rssx/news"
-	"wiloon.com/rssx/utils"
 )
 
 func Sync() {

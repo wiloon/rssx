@@ -3,9 +3,9 @@ package data
 import (
 	"github.com/wiloon/wiloon-data/mysql"
 	"github.com/wiloon/wiloon-log/log"
+	"rssx/feed"
+	"rssx/news"
 	"time"
-	"wiloon.com/rssx/feed"
-	"wiloon.com/rssx/news"
 )
 
 var rssx mysql.Database

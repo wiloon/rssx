@@ -5,12 +5,12 @@ import (
 	"github.com/wiloon/app-config"
 	"github.com/wiloon/wiloon-log/log"
 	"net/http"
+	"rssx/data"
+	"rssx/feed"
+	"rssx/feed/news/list"
+	"rssx/news"
+	"rssx/rss"
 	"strconv"
-	"wiloon.com/rssx/data"
-	"wiloon.com/rssx/feed"
-	"wiloon.com/rssx/feed/news/list"
-	"wiloon.com/rssx/news"
-	"wiloon.com/rssx/rss"
 )
 
 const userId = 0
