@@ -148,7 +148,7 @@ func (server MarkReadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// load next page
 	newsList := loadNewsListByFeed(feedId)
 	jsonStr, _ := json.Marshal(newsList)
-	w.Write([]byte(jsonStr))
+	_, _ = w.Write([]byte(jsonStr))
 }
 
 const port = "3000"
@@ -156,8 +156,11 @@ const port = "3000"
 func main() {
 	log.Info("rssx starting...")
 
-	//start rss sync
+	//同步新闻列表， rss源>redis
 	go rss.Sync()
+
+	//定时清理缓存
+	go rss.Gc()
 
 	dir := config.GetString("client.dir", "")
 	log.Info("client dir:", dir)

@@ -16,9 +16,19 @@ import (
 	"time"
 )
 
-func Sync() {
+func Gc() {
+	duration := time.Minute * time.Duration(config.GetInt("sync.duration"))
+	ticker := time.NewTicker(duration)
+	for ; true; <-ticker.C {
+		// clear cache
+		//删除一段时间 之前 的数据。
 
-	duration := time.Duration(time.Minute * time.Duration(config.GetInt("sync.duration")))
+		log.Info("clean cache done.")
+	}
+}
+
+func Sync() {
+	duration := time.Minute * time.Duration(config.GetInt("sync.duration"))
 	ticker := time.NewTicker(duration)
 	for ; true; <-ticker.C {
 		//find all feeds
@@ -31,8 +41,7 @@ func Sync() {
 }
 
 func SyncFeed(feed feed.Feed) {
-	log.Info("sync feed:", feed)
-
+	log.Info("sync feed:", feed.Url)
 	result, err := http.Get(feed.Url)
 	if err != nil {
 		log.Info("failed to sync feed:", feed)
@@ -45,7 +54,6 @@ func SyncFeed(feed feed.Feed) {
 	if result.StatusCode == http.StatusOK {
 		remoteFeedBody, _ = ioutil.ReadAll(result.Body)
 		bodyString := string(remoteFeedBody) //todo if debug enabled convert to string
-
 		log.Debug("get feed OK, feed body:", bodyString)
 	}
 
@@ -58,11 +66,10 @@ func SyncFeed(feed feed.Feed) {
 
 	for i, v := range v.Chan.Items {
 		// compare and save
-
 		url := v.Link
 		guid := v.Guid
 
-		log.Infof("index:%v, title:%v, guid:%v", i, string(v.Title), guid)
+		log.Debugf("index:%v, title:%v, guid:%v", i, string(v.Title), guid)
 
 		if strings.EqualFold(guid, "") {
 			guid = v.Link
