@@ -53,8 +53,7 @@ func (site *Site) Append(title, url, description string) {
 }
 
 func (n *News) Save() {
-
-	redisx.Conn.Do("HMSET", "news:"+n.Id,
+	_, _ = redisx.Conn.Do("HMSET", "news:"+n.Id,
 		FeedId, n.FeedId,
 		Title, n.Title,
 		Url, n.Url,

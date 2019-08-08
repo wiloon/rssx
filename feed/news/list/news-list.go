@@ -23,7 +23,7 @@ func NewList(userId int, feed feed.Feed) *NewsList {
 }
 func (newsList *NewsList) AppendNews(score int64, newsId string) {
 	feedNewsKey := FeedNewsKeyPrefix + strconv.Itoa(int(newsList.feed.Id))
-	redisx.Conn.Do("ZADD", feedNewsKey, score, newsId)
+	_, _ = redisx.Conn.Do("ZADD", feedNewsKey, score, newsId)
 }
 
 func FindNewsListByUserFeed(userId, feedId int) []string {
