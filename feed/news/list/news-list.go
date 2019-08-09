@@ -98,7 +98,7 @@ func GetLatestReadIndex(userId, feedId int) int64 {
 
 func SetReadIndex(userId, feedId int, score int64) {
 
-	redisx.Conn.Do("SET", userFeedLatestReadIndex+strconv.Itoa(userId)+":"+strconv.Itoa(feedId), score)
+	_, _ = redisx.Conn.Do("SET", userFeedLatestReadIndex+strconv.Itoa(userId)+":"+strconv.Itoa(feedId), score)
 	log.Debugf("reset read index, index:%v", score)
 }
 

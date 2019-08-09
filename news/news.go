@@ -62,7 +62,6 @@ func (n *News) Save() {
 		Guid, n.Guid,
 		Score, n.Score,
 	)
-
 	log.Info("save news:" + n.Title)
 }
 
@@ -81,7 +80,7 @@ func (n *News) IsRead(userId int) bool {
 }
 
 func (n *News) MarkRead(userId int) {
-	redisx.Conn.Do("SADD", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(n.FeedId)), n.Id)
+	_, _ = redisx.Conn.Do("SADD", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(n.FeedId)), n.Id)
 	log.Debugf("mark news as read, news id: %v", n.Id)
 }
 
@@ -112,5 +111,5 @@ func (n *News) Load() {
 }
 
 func DelReadMark(userId, feedId int) {
-	redisx.Conn.Do("DEL", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(feedId)))
+	_, _ = redisx.Conn.Do("DEL", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(feedId)))
 }
