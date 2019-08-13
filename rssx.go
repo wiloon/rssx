@@ -125,7 +125,7 @@ func (server PreviousNewsServer) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	n.NextId = nextNewsId
 
 	jsonStr, _ := json.Marshal(n)
-	w.Write([]byte(jsonStr))
+	_, _ = w.Write([]byte(jsonStr))
 }
 
 type MarkReadServer struct {
@@ -137,12 +137,14 @@ func (server MarkReadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	feedId, _ := strconv.Atoi(r.Form.Get("feedId"))
 	log.Debugf("mark read, feed id: %v", feedId)
 
+	// 缓存里最后的已读索引, todo, 删除后会变
 	readIndex := list.GetLatestReadIndex(userId, feedId)
 	// reset read index
-	newIndex := readIndex + list.PageSize
-	list.SetReadIndex(0, feedId, newIndex)
+	newIndex := readIndex + list.PageSize  //新已读=旧值加每页数量
+	list.SetReadIndex(0, feedId, newIndex) //save
+
 	log.Debugf("set read index:  %v", newIndex)
-	// del read mark set
+	// del read mark set,按feed删除
 	news.DelReadMark(0, feedId)
 
 	// load next page
