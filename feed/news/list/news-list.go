@@ -21,6 +21,9 @@ func NewList(userId int, feed feed.Feed) *NewsList {
 	result.feed = feed
 	return result
 }
+
+// 新文章 ， 加入 到id集合
+// score : 当前时间戳
 func (newsList *NewsList) AppendNews(score int64, newsId string) {
 	feedNewsKey := FeedNewsKeyPrefix + strconv.Itoa(int(newsList.feed.Id))
 	_, _ = redisx.Conn.Do("ZADD", feedNewsKey, score, newsId)
@@ -80,26 +83,29 @@ func feedNewsKey(feedId int) string {
 // news list read index, value=sorted set range index, not score
 const userFeedLatestReadIndex string = "read_index:"
 
+// todo, 按score取index
 func GetLatestReadIndex(userId, feedId int) int64 {
-	result := 0
-	readIndexKey := userFeedLatestReadIndex + strconv.Itoa(userId) + ":" + strconv.Itoa(feedId)
-	r, err := redisx.Conn.Do("GET", readIndexKey)
+	score := 0
+	readMark := userFeedLatestReadIndex + strconv.Itoa(userId) + ":" + strconv.Itoa(feedId)
+	r, err := redisx.Conn.Do("GET", readMark)
 	if err != nil {
 		log.Info(err.Error())
 	}
 	if r != nil {
 		b := r.([]byte)
 		i := string(b)
-		result, _ = strconv.Atoi(i)
+		score, _ = strconv.Atoi(i)
 	}
-	log.Debugf("latest read index: %v", result)
-	return int64(result)
+	log.Debugf("latest read mark score: %v", score)
+
+	return int64(score)
 }
 
-func SetReadIndex(userId, feedId int, score int64) {
+// todo,存score值
+func SetReadIndex(userId, feedId int, index int64) {
 
-	_, _ = redisx.Conn.Do("SET", userFeedLatestReadIndex+strconv.Itoa(userId)+":"+strconv.Itoa(feedId), score)
-	log.Debugf("reset read index, index:%v", score)
+	_, _ = redisx.Conn.Do("SET", userFeedLatestReadIndex+strconv.Itoa(userId)+":"+strconv.Itoa(feedId), index)
+	log.Debugf("reset read index, index:%v", index)
 }
 
 func FindIndexById(feedId int, newsId string) int64 {
