@@ -1,8 +1,9 @@
 package data
 
 import (
-	"github.com/wiloon/wiloon-data/mysql"
-	"github.com/wiloon/wiloon-log/log"
+	log "github.com/sirupsen/logrus"
+	"github.com/wiloon/pingd-config"
+	"github.com/wiloon/pingd-data/mysql"
 	"rssx/feed"
 	"rssx/news"
 	"time"
@@ -11,8 +12,9 @@ import (
 var rssx mysql.Database
 
 func init() {
-	config := mysql.Config{DatabaseName: "rssx", Address: "127.0.0.1:3306", Username: "user0", Password: "password0"}
-	rssx = mysql.NewDatabase(config)
+	address := config.GetString("mysql.address", "127.0.0.1:3306")
+	mysqlConfig := mysql.Config{DatabaseName: "rssx", Address: address, Username: "user0", Password: "password0"}
+	rssx = mysql.NewDatabase(mysqlConfig)
 
 }
 

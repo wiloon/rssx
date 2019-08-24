@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/wiloon/app-config"
-	"github.com/wiloon/wiloon-log/log"
+
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"rssx/data"
 	"rssx/feed"
@@ -131,7 +131,7 @@ func (server PreviousNewsServer) ServeHTTP(w http.ResponseWriter, r *http.Reques
 type MarkReadServer struct {
 }
 
-// mark page as read
+// 标记整页为已读
 func (server MarkReadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	feedId, _ := strconv.Atoi(r.Form.Get("feedId"))

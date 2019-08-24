@@ -1,0 +1,5 @@
+[mysql]
+address="127.0.0.1:3306"
+
+[redis]
+address="nuc:6379"

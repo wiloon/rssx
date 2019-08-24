@@ -2,7 +2,12 @@ package list
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
+	config "github.com/wiloon/pingd-config"
+	"os"
+	"rssx/storage/redisx"
 	"testing"
+	"time"
 )
 
 func TestReadIndex(t *testing.T) {
@@ -18,4 +23,25 @@ func TestCount(t *testing.T) {
 
 	v := Count(0)
 	fmt.Println(v)
+}
+
+func Test0(t *testing.T) {
+	log.Infof("start...")
+	_ = os.Setenv("app_config", "/tmp/rssx-config-toml")
+	config.LoadLocalConfig("rssx-config-toml")
+
+	score0 := time.Now().UnixNano()
+	redisx.ZADD("k0", score0, "news0")
+	score1 := time.Now().UnixNano()
+	redisx.ZADD("k0", score1, "news1")
+	score2 := time.Now().UnixNano()
+	redisx.ZADD("k0", score2, "news2")
+
+	r, _ := redisx.GetConn().Do("ZRANGEBYSCORE", "k0", score1, score1)
+	foo := r.([]interface{})
+	for k, v := range foo {
+		fmt.Println(k)
+		fmt.Println(string(v.([]byte)))
+	}
+
 }

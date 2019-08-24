@@ -1,7 +1,7 @@
 package list
 
 import (
-	"github.com/wiloon/wiloon-log/log"
+	log "github.com/sirupsen/logrus"
 	"rssx/feed"
 	"rssx/storage/redisx"
 	"strconv"
@@ -26,7 +26,7 @@ func NewList(userId int, feed feed.Feed) *NewsList {
 // score : 当前时间戳
 func (newsList *NewsList) AppendNews(score int64, newsId string) {
 	feedNewsKey := FeedNewsKeyPrefix + strconv.Itoa(int(newsList.feed.Id))
-	_, _ = redisx.Conn.Do("ZADD", feedNewsKey, score, newsId)
+	_, _ = redisx.GetConn().Do("ZADD", feedNewsKey, score, newsId)
 }
 
 func FindNewsListByUserFeed(userId, feedId int) []string {
@@ -47,7 +47,7 @@ func NewsListKey(feedId int) string {
 func FindNewsListByRange(key string, start, end int64) []string {
 	var newsidList []string
 
-	result, err := redisx.Conn.Do("ZRANGE", key, start, end)
+	result, err := redisx.GetConn().Do("ZRANGE", key, start, end)
 	if err != nil {
 		log.Info("failed to get news")
 	}
@@ -64,7 +64,7 @@ func FindNextId(feedId int, newsId string) string {
 	var nextNewsId string
 	index := FindIndexById(feedId, newsId)
 	nextIndex := index + 1
-	foo, _ := redisx.Conn.Do("ZRANGE", feedNewsKey(feedId), nextIndex, nextIndex)
+	foo, _ := redisx.GetConn().Do("ZRANGE", feedNewsKey(feedId), nextIndex, nextIndex)
 	if len(foo.([]interface{})) > 0 {
 		nextNewsId = string(foo.([]interface{})[0].([]byte))
 
@@ -83,11 +83,13 @@ func feedNewsKey(feedId int) string {
 // news list read index, value=sorted set range index, not score
 const userFeedLatestReadIndex string = "read_index:"
 
-// todo, 按score取index
+/* todo, 按score取index
+redis里保存 score, 取位置时先取score再用score取member,再用member取位置   -_-!!
+*/
 func GetLatestReadIndex(userId, feedId int) int64 {
 	score := 0
-	readMark := userFeedLatestReadIndex + strconv.Itoa(userId) + ":" + strconv.Itoa(feedId)
-	r, err := redisx.Conn.Do("GET", readMark)
+	readMarkKey := userFeedLatestReadIndex + strconv.Itoa(userId) + ":" + strconv.Itoa(feedId)
+	r, err := redisx.GetConn().Do("GET", readMarkKey)
 	if err != nil {
 		log.Info(err.Error())
 	}
@@ -97,6 +99,7 @@ func GetLatestReadIndex(userId, feedId int) int64 {
 		score, _ = strconv.Atoi(i)
 	}
 	log.Debugf("latest read mark score: %v", score)
+	//r, _ := redisx.Conn.Do("ZRANGEBYSCORE", score, score)
 
 	return int64(score)
 }
@@ -104,13 +107,13 @@ func GetLatestReadIndex(userId, feedId int) int64 {
 // todo,存score值
 func SetReadIndex(userId, feedId int, index int64) {
 
-	_, _ = redisx.Conn.Do("SET", userFeedLatestReadIndex+strconv.Itoa(userId)+":"+strconv.Itoa(feedId), index)
+	_, _ = redisx.GetConn().Do("SET", userFeedLatestReadIndex+strconv.Itoa(userId)+":"+strconv.Itoa(feedId), index)
 	log.Debugf("reset read index, index:%v", index)
 }
 
 func FindIndexById(feedId int, newsId string) int64 {
 	var index int64
-	result, err := redisx.Conn.Do("ZRANK", feedNewsKey(feedId), newsId)
+	result, err := redisx.GetConn().Do("ZRANK", feedNewsKey(feedId), newsId)
 	if err != nil {
 		log.Info(err.Error())
 	}
@@ -125,7 +128,7 @@ func FindIndexById(feedId int, newsId string) int64 {
 
 func Count(feedId int) int64 {
 	var count int64
-	result, err := redisx.Conn.Do("ZCARD", feedNewsKey(feedId))
+	result, err := redisx.GetConn().Do("ZCARD", feedNewsKey(feedId))
 	if err != nil {
 		log.Info(err.Error())
 	}
