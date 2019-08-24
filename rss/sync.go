@@ -3,8 +3,8 @@ package rss
 import (
 	"encoding/xml"
 	"fmt"
-	"github.com/wiloon/app-config"
-	"github.com/wiloon/wiloon-log/log"
+	log "github.com/sirupsen/logrus"
+	"github.com/wiloon/pingd-config"
 	"io/ioutil"
 	"net/http"
 	"rssx/data"

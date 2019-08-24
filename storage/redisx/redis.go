@@ -2,18 +2,35 @@ package redisx
 
 import (
 	"github.com/garyburd/redigo/redis"
-	"github.com/wiloon/wiloon-log/log"
+	log "github.com/sirupsen/logrus"
+	"github.com/wiloon/pingd-config"
 )
 
-var Conn redis.Conn
+var conn redis.Conn
 
 func init() {
+	connect()
+}
+
+func ZADD(key string, score int64, member string) {
+	_, _ = GetConn().Do("ZADD", key, score, member)
+
+}
+func GetConn() redis.Conn {
+	if conn == nil {
+		conn = connect()
+	}
+	return conn
+}
+func connect() redis.Conn {
 	var err error
-	Conn, err = redis.Dial("tcp", "127.0.0.1:6379")
+	address := config.GetString("redis.address", "127.0.0.1:6379")
+	conn, err = redis.Dial("tcp", address)
 	if err != nil {
 		log.Info("failed to connect to redis:" + err.Error())
 	}
-
+	log.Infof("connected to redis, address: %v, conn: %v", address, conn)
+	return conn
 }
 
 //func GetLatestReadIndex(userId, feedId int) string {

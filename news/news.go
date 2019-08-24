@@ -2,7 +2,7 @@ package news
 
 import (
 	"github.com/garyburd/redigo/redis"
-	"github.com/wiloon/wiloon-log/log"
+	log "github.com/sirupsen/logrus"
 	"rssx/storage/redisx"
 	"strconv"
 )
