@@ -5,17 +5,12 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
+	config "github.com/wiloon/pingd-config"
+	"os"
 	"testing"
 	"time"
 )
-
-func TestSaveNews(t *testing.T) {
-	SaveNews(0, "t0", "u0", "d0", time.Now(), "g0")
-}
-
-func TestFindNewsListByUserFeed(t *testing.T) {
-	FindNewsListByUserFeed(0, 0)
-}
 
 func TestUUID(t *testing.T) {
 	rootUUID, _ := uuid.FromString("5e4a8cfe-73df-4ca6-8089-18c189cc1aa3")
@@ -48,10 +43,22 @@ func TestMd5(t *testing.T) {
 
 }
 
-func TestSaveReadSet(t *testing.T) {
-	SaveReadMark(0, 0, "d033b8dfe091ef0262bd54dcb49bc04e")
-}
+func Test0(t *testing.T) {
+	log.Infof("start...")
+	_ = os.Setenv("app_config", "/tmp/rssx-config-toml")
+	config.LoadLocalConfig("rssx-config-toml")
 
-func TestGetReadMark(t *testing.T) {
-	SaveReadMark(0, 0, "d033b8dfe091ef0262bd54dcb49bc04e")
+	score0 := time.Now().UnixNano()
+	ZADD("k0", score0, "news0")
+	score1 := time.Now().UnixNano()
+	ZADD("k0", score1, "news1")
+	score2 := time.Now().UnixNano()
+	ZADD("k0", score2, "news2")
+
+	r, _ := GetConn().Do("ZRANGEBYSCORE", "k0", score1, score1)
+	foo := r.([]interface{})
+	s := string(foo[0].([]byte))
+	fmt.Println(s)
+
+	GetIndexByScore("k0", score1)
 }

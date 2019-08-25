@@ -12,4 +12,4 @@ require (
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 )
 
-replace github.com/wiloon/pingd-config => /home/wiloon/projects/pingd-config
+replace github.com/wiloon/pingd-config => /home/wiloonwy/projects/pingd-config
