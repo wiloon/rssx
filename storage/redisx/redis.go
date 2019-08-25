@@ -33,16 +33,11 @@ func connect() redis.Conn {
 	return conn
 }
 
-//func GetLatestReadIndex(userId, feedId int) string {
-//	result, _ := Conn.Do("GET", userFeedLatestReadIndex+strconv.Itoa(userId)+":"+strconv.Itoa(feedId))
-//	return result.(string)
-//}
-//
-//func SaveLatestReadIndex(userId, feedId int, score string) {
-//	Conn.Do("SET", userFeedLatestReadIndex+strconv.Itoa(userId)+":"+strconv.Itoa(feedId), score)
-//}
+func GetIndexByScore(key string, score int64) {
+	r, _ := GetConn().Do("ZRANGEBYSCORE", key, score, score)
+	foo := r.([]interface{})
+	member := string(foo[0].([]byte))
 
-//
-//func FindNewsByScore(feedId int, min, max string) {
-//	Conn.Do("ZRANGEBYSCORE", feedNewsKeyPrefix+strconv.Itoa(feedId), "("+min, "("+max)
-//}
+	rank, _ := GetConn().Do("ZRANK", key, member)
+	log.Infof("rank: %v", rank)
+}

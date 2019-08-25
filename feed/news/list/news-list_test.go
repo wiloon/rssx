@@ -39,9 +39,6 @@ func Test0(t *testing.T) {
 
 	r, _ := redisx.GetConn().Do("ZRANGEBYSCORE", "k0", score1, score1)
 	foo := r.([]interface{})
-	for k, v := range foo {
-		fmt.Println(k)
-		fmt.Println(string(v.([]byte)))
-	}
-
+	s := string(foo[0].([]byte))
+	fmt.Println(s)
 }
