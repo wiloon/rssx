@@ -53,7 +53,7 @@ func (site *Site) Append(title, url, description string) {
 }
 
 func (n *News) Save() {
-	_, _ = redisx.Conn.Do("HMSET", "news:"+n.Id,
+	_, _ = redisx.GetConn().Do("HMSET", "news:"+n.Id,
 		FeedId, n.FeedId,
 		Title, n.Title,
 		Url, n.Url,
@@ -62,7 +62,7 @@ func (n *News) Save() {
 		Guid, n.Guid,
 		Score, n.Score,
 	)
-	log.Info("save news:" + n.Title)
+	log.Debug("save news:" + n.Title)
 }
 
 // read mark, redis set, value=news id
@@ -71,7 +71,7 @@ const newsReadMark string = "read_mark:"
 func (n *News) IsRead(userId int) bool {
 	read := false
 	readMarkKey := newsReadMark + strconv.Itoa(userId) + ":" + strconv.Itoa(int(n.FeedId))
-	r, _ := redisx.Conn.Do("SISMEMBER", readMarkKey, n.Id)
+	r, _ := redisx.GetConn().Do("SISMEMBER", readMarkKey, n.Id)
 	if r.(int64) == 1 {
 		read = true
 	}
@@ -80,14 +80,14 @@ func (n *News) IsRead(userId int) bool {
 }
 
 func (n *News) MarkRead(userId int) {
-	_, _ = redisx.Conn.Do("SADD", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(n.FeedId)), n.Id)
+	_, _ = redisx.GetConn().Do("SADD", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(n.FeedId)), n.Id)
 	log.Debugf("mark news as read, news id: %v", n.Id)
 }
 
 const newsKeyPrefix string = "news:"
 
 func (n *News) LoadTitle() {
-	result, _ := redis.Values(redisx.Conn.Do("HMGET", newsKeyPrefix+n.Id, Title))
+	result, _ := redis.Values(redisx.GetConn().Do("HMGET", newsKeyPrefix+n.Id, Title))
 	n.Title = string(result[0].([]byte))
 }
 func (n *News) LoadReadFlag(userId int) {
@@ -97,7 +97,7 @@ func (n *News) LoadReadFlag(userId int) {
 	log.Debugf("read mark, news id: %v, title: %v", n.Id, n.Title)
 }
 func (n *News) Load() {
-	result, err := redis.Values(redisx.Conn.Do("HMGET", newsKeyPrefix+n.Id, Title, Url, Description, Score))
+	result, err := redis.Values(redisx.GetConn().Do("HMGET", newsKeyPrefix+n.Id, Title, Url, Description, Score))
 	if err != nil {
 		log.Info(err.Error())
 	}
@@ -111,5 +111,5 @@ func (n *News) Load() {
 }
 
 func DelReadMark(userId, feedId int) {
-	_, _ = redisx.Conn.Do("DEL", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(feedId)))
+	_, _ = redisx.GetConn().Do("DEL", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(feedId)))
 }
