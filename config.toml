@@ -1,5 +1,12 @@
 [mysql]
-address="127.0.0.1:3306"
+address="nuc:3306"
 
 [redis]
 address="nuc:6379"
+
+[ui]
+path="/home/wiloon/projects/rssx/rssx-client/dist/"
+
+[sync]
+# minute
+duration=60

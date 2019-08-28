@@ -60,5 +60,6 @@ func Test0(t *testing.T) {
 	s := string(foo[0].([]byte))
 	fmt.Println(s)
 
-	GetIndexByScore("k0", score1)
+	r = GetIndexByScore("k0", score1)
+	log.Info(r)
 }
