@@ -13,7 +13,9 @@ var rssx mysql.Database
 
 func init() {
 	address := config.GetString("mysql.address", "127.0.0.1:3306")
-	mysqlConfig := mysql.Config{DatabaseName: "rssx", Address: address, Username: "user0", Password: "password0"}
+	user := config.GetString("mysql.user", "user0")
+	password := config.GetString("mysql.password", "password0")
+	mysqlConfig := mysql.Config{DatabaseName: "rssx", Address: address, Username: user, Password: password}
 	rssx = mysql.NewDatabase(mysqlConfig)
 
 }

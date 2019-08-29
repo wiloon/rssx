@@ -155,7 +155,7 @@ func (server MarkReadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(jsonStr))
 }
 
-const port = "3000"
+const port = "3001"
 
 func main() {
 	log.SetFormatter(&log.TextFormatter{})
@@ -165,7 +165,7 @@ func main() {
 	log.Info("rssx starting...")
 
 	//同步新闻列表， rss源>redis
-	// go rss.Sync()
+	//go rss.Sync()
 
 	//定时清理缓存
 	go rss.Gc()
