@@ -12,3 +12,5 @@ require (
 )
 
 replace github.com/wiloon/pingd-config => /home/roy/workspace/my-projects/pingd-data/
+
+//replace github.com/wiloon/pingd-config => /home/wiloon/projects/pingd-config/
