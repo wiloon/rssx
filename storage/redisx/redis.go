@@ -33,11 +33,24 @@ func connect() redis.Conn {
 	return conn
 }
 
-func GetIndexByScore(key string, score int64) {
-	r, _ := GetConn().Do("ZRANGEBYSCORE", key, score, score)
-	foo := r.([]interface{})
-	member := string(foo[0].([]byte))
+func GetIndexByScore(key string, score int64) int64 {
+	var rank int64
+	if score == 0 {
+		rank = 0
+	} else {
+		log.Debugf("get rank by score, key: %v, score: %v", key, score)
+		r, err := GetConn().Do("ZRANGEBYSCORE", key, score, score)
+		if err != nil {
+			log.Error(err)
+		}
+		log.Infof("result: %v", r)
 
-	rank, _ := GetConn().Do("ZRANK", key, member)
+		foo := r.([]interface{})
+		member := string(foo[0].([]byte))
+
+		t, _ := GetConn().Do("ZRANK", key, member)
+		rank = t.(int64)
+	}
 	log.Infof("rank: %v", rank)
+	return rank
 }

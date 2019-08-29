@@ -100,8 +100,8 @@ func GetLatestReadIndex(userId, feedId int) int64 {
 	}
 	log.Debugf("latest read mark score: %v", score)
 	//r, _ := redisx.Conn.Do("ZRANGEBYSCORE", score, score)
-
-	return int64(score)
+	rank := redisx.GetIndexByScore(readMarkKey, int64(score))
+	return rank
 }
 
 // todo,存score值
