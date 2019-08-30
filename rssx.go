@@ -40,7 +40,7 @@ func (server HttpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	jsonStr, _ := json.Marshal(feeds)
 	log.Info("api feeds:", jsonStr)
-	w.Write([]byte(jsonStr))
+	_, _ = w.Write([]byte(jsonStr))
 }
 
 type NewsListServer struct {
@@ -135,9 +135,9 @@ type MarkReadServer struct {
 
 // 标记整页为已读
 func (server MarkReadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	_ = r.ParseForm()
 	feedId, _ := strconv.Atoi(r.Form.Get("feedId"))
-	log.Debugf("mark read, feed id: %v", feedId)
+	log.Debugf("mark this page as read, feed id: %v", feedId)
 
 	// 缓存里最后的已读索引, todo, 删除后会变
 	readIndex := list.GetLatestReadIndex(userId, feedId)

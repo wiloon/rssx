@@ -98,14 +98,17 @@ func GetLatestReadIndex(userId, feedId int) int64 {
 		i := string(b)
 		score, _ = strconv.Atoi(i)
 	}
-	log.Debugf("latest read mark score: %v", score)
 	//r, _ := redisx.Conn.Do("ZRANGEBYSCORE", score, score)
 	rank := redisx.GetIndexByScore(readMarkKey, int64(score))
+	log.Debugf("latest read mark score, key: %v, score: %v, rank: %v", readMarkKey, score, rank)
 	return rank
 }
 
 // todo,存score值
 func SetReadIndex(userId, feedId int, index int64) {
+	// get score by rank
+	//ZRANGE
+	//ZSCORE
 
 	_, _ = redisx.GetConn().Do("SET", userFeedLatestReadIndex+strconv.Itoa(userId)+":"+strconv.Itoa(feedId), index)
 	log.Debugf("reset read index, index:%v", index)

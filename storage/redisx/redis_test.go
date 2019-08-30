@@ -12,6 +12,9 @@ import (
 	"time"
 )
 
+func Test00(t *testing.T) {
+	GetScoreByRank("read_index:0:5", 0)
+}
 func TestUUID(t *testing.T) {
 	rootUUID, _ := uuid.FromString("5e4a8cfe-73df-4ca6-8089-18c189cc1aa3")
 

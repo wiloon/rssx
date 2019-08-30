@@ -54,3 +54,17 @@ func GetIndexByScore(key string, score int64) int64 {
 	log.Infof("rank: %v", rank)
 	return rank
 }
+
+func GetScoreByRank(key string, rank int) int64 {
+	result, err := GetConn().Do("ZRANGE", key, rank, rank)
+	if err != nil {
+		log.Info("failed to get news")
+	}
+	foo := result.([]interface{})
+	bar := foo[0].([]byte)
+	member := string(bar)
+
+	t, _ := GetConn().Do("ZSCORE", key, member)
+	score := t.(int64)
+	return score
+}
