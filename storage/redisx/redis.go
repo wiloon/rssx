@@ -4,6 +4,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	log "github.com/sirupsen/logrus"
 	"github.com/wiloon/pingd-config"
+	"strconv"
 )
 
 var conn redis.Conn
@@ -55,7 +56,7 @@ func GetIndexByScore(key string, score int64) int64 {
 	return rank
 }
 
-func GetScoreByRank(key string, rank int) int64 {
+func GetScoreByRank(key string, rank int64) int64 {
 	result, err := GetConn().Do("ZRANGE", key, rank, rank)
 	if err != nil {
 		log.Info("failed to get news")
@@ -63,8 +64,10 @@ func GetScoreByRank(key string, rank int) int64 {
 	foo := result.([]interface{})
 	bar := foo[0].([]byte)
 	member := string(bar)
-
+	log.Debugf("rank: %v, member: %v", rank, member)
 	t, _ := GetConn().Do("ZSCORE", key, member)
-	score := t.(int64)
-	return score
+	score := t.([]byte)
+	scoreStr := string(score)
+	scoreInt, _ := strconv.ParseInt(scoreStr, 10, 64)
+	return scoreInt
 }
