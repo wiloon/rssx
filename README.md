@@ -36,7 +36,7 @@ value: newsId
 
 
 ```sql
-
+CREATE DATABASE rssx DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;
 DROP TABLE IF EXISTS `feed`;
 CREATE TABLE IF NOT EXISTS `feed` (
   `feed_id` bigint(20) NOT NULL AUTO_INCREMENT,

@@ -110,7 +110,10 @@ func SetReadIndex(userId, feedId int, index int64) {
 	//ZRANGE
 	//ZSCORE
 
-	_, _ = redisx.GetConn().Do("SET", userFeedLatestReadIndex+strconv.Itoa(userId)+":"+strconv.Itoa(feedId), index)
+	key := userFeedLatestReadIndex + strconv.Itoa(userId) + ":" + strconv.Itoa(feedId)
+	score := redisx.GetScoreByRank(key, index)
+
+	_, _ = redisx.GetConn().Do("SET", key, score)
 	log.Debugf("reset read index, index:%v", index)
 }
 
