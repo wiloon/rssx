@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	config "github.com/wiloon/pingd-config"
 	"os"
+	"rssx/rss"
 
 	log "github.com/sirupsen/logrus"
 	"net/http"
@@ -157,8 +158,6 @@ func (server MarkReadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(jsonStr))
 }
 
-const port = "3001"
-
 func main() {
 	log.SetFormatter(&log.TextFormatter{})
 	log.SetOutput(os.Stdout)
@@ -167,10 +166,10 @@ func main() {
 	log.Info("rssx starting...")
 
 	//同步新闻列表， rss源>redis
-	//go rss.Sync()
+	go rss.Sync()
 
 	//定时清理缓存
-	//go rss.Gc()
+	go rss.Gc()
 
 	dir := config.GetString("ui.path", "")
 	log.Info("ui path: ", dir)
@@ -191,6 +190,7 @@ func main() {
 	var markReadServer MarkReadServer
 	http.Handle("/api/mark-read", markReadServer)
 
+	port := config.GetString("rssx.port", "3000")
 	log.Info("rssx server listening:", port)
 	err := http.ListenAndServe(":"+port, nil)
 	handleErr(err)
