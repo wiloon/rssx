@@ -11,18 +11,38 @@ import (
 	"rssx/feed"
 	"rssx/feed/news/list"
 	"rssx/news"
+	"rssx/storage/redisx"
 	"rssx/utils"
+	"strconv"
 	"strings"
 	"time"
 )
 
 func Gc() {
-	duration := time.Minute * time.Duration(config.GetInt("sync.duration"))
-	ticker := time.NewTicker(duration)
+	gcDuration, _ := time.ParseDuration(config.GetString("news.gc-duration", "24h"))
+	ticker := time.NewTicker(gcDuration)
 	for ; true; <-ticker.C {
 		// clear cache
 		//删除一段时间 之前 的数据。
+		// 取一个月之前的score
+		expireTime := config.GetString("news.expire-time", "-720h")
+		d, _ := time.ParseDuration(expireTime)
+		oneMonthAgo := time.Now().Add(d)
+		oneMonthAgoMicroSecond := utils.TimeToMicroSecond(oneMonthAgo)
 
+		tmp := data.FindUserFeeds(0)
+
+		for _, v := range tmp {
+			feedId := int(v.Id)
+			feedNewsKey := list.FeedNewsKeyPrefix + strconv.Itoa(feedId)
+			expiredNews := redisx.GetNewsIdListByScore(feedNewsKey, 0, oneMonthAgoMicroSecond)
+			for _, newsId := range expiredNews {
+				// 删除news
+				redisx.DeleteNews(newsId)
+			}
+			//删除0 - score 的数据
+			redisx.DeleteNewsIndex(feedNewsKey, 0, oneMonthAgoMicroSecond)
+		}
 		log.Info("clean cache done.")
 	}
 }
@@ -78,7 +98,7 @@ func SyncFeed(feed feed.Feed) {
 		newsList := list.NewList(0, feed)
 
 		// since duplicate pub date, and invalid pub date, set time.now() as score, make sure no duplicate score
-		score := time.Now().UnixNano()
+		score := utils.TimeNowMicrosecond()
 
 		newsId := utils.Md5(guid)
 		if list.FindIndexById(int(feed.Id), newsId) == -1 {

@@ -8,8 +8,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	config "github.com/wiloon/pingd-config"
 	"os"
+	"rssx/utils"
 	"testing"
-	"time"
 )
 
 func Test00(t *testing.T) {
@@ -53,13 +53,13 @@ func Test0(t *testing.T) {
 	config.LoadLocalConfig("rssx-config-toml")
 
 	key := "k0"
-	score0 := timeNowMicrosecond()
+	score0 := utils.TimeNowMicrosecond()
 	log.Infof("score0: %v", score0)
 	ZADD("k0", score0, "news0")
-	score1 := timeNowMicrosecond()
+	score1 := utils.TimeNowMicrosecond()
 	log.Infof("score1: %v", score1)
 	ZADD("k0", score1, "news1")
-	score2 := timeNowMicrosecond()
+	score2 := utils.TimeNowMicrosecond()
 	log.Infof("score2: %v", score2)
 	ZADD("k0", score2, "news2")
 
@@ -68,7 +68,7 @@ func Test0(t *testing.T) {
 	s := string(foo[0].([]byte))
 	log.Info("get member by score, member: " + s)
 
-	r = GetIndexByScore("k0", score1)
+	r = GetRankByScore("k0", score1)
 	log.Infof("get index by score, score: %v, index: %v", score1, r)
 
 	score := GetScoreByRank(key, 0)
@@ -81,6 +81,8 @@ func Test0(t *testing.T) {
 	log.Infof("get score by rank, rank:%v, score: %v", 2, score)
 }
 
-func timeNowMicrosecond() int64 {
-	return time.Now().UnixNano() / int64(time.Microsecond)
+func TestRemove(t *testing.T) {
+	config.LoadLocalConfig("config.toml")
+	foo := GetNewsIdListByScore("feed_news:5", 0, 1567313745273629)
+	fmt.Println(foo)
 }

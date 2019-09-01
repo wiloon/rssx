@@ -10,3 +10,7 @@ path="/home/wiloon/projects/rssx/rssx-client/dist/"
 [sync]
 # minute
 duration=60
+
+[news]
+expire-time="-720h"
+gc-duration="24h"
