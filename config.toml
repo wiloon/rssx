@@ -1,3 +1,6 @@
+[rssx]
+port="3000"
+
 [mysql]
 address="nuc:3306"
 
