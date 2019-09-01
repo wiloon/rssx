@@ -35,7 +35,7 @@ func FindNewsListByUserFeed(userId, feedId int) []string {
 	latestReadIndex := GetLatestReadIndex(userId, feedId)
 	key := NewsListKey(feedId)
 
-	newsList = FindNewsListByRange(key, latestReadIndex, latestReadIndex+PageSize-1)
+	newsList = FindNewsListByRange(key, latestReadIndex+1, latestReadIndex+PageSize-1)
 	log.Infof("find news list by feed,read index: %v, news size: %v", latestReadIndex, len(newsList))
 	return newsList
 }
@@ -57,6 +57,7 @@ func FindNewsListByRange(key string, start, end int64) []string {
 		log.Info("news id: " + newsId)
 		newsidList = append(newsidList, newsId)
 	}
+	log.Debugf("find news list by rang, start: %v, end: %v, list size: %v", start, end, len(newsidList))
 	return newsidList
 }
 
@@ -93,28 +94,30 @@ func GetLatestReadIndex(userId, feedId int) int64 {
 	if err != nil {
 		log.Info(err.Error())
 	}
+	var rank int64
 	if r != nil {
 		b := r.([]byte)
 		i := string(b)
 		score, _ = strconv.Atoi(i)
+		feedNewsKey := FeedNewsKeyPrefix + strconv.Itoa(feedId)
+		rank = redisx.GetRankByScore(feedNewsKey, int64(score))
+	} else {
+		rank = -1
 	}
-	//r, _ := redisx.Conn.Do("ZRANGEBYSCORE", score, score)
-	rank := redisx.GetIndexByScore(readMarkKey, int64(score))
-	log.Debugf("latest read mark score, key: %v, score: %v, rank: %v", readMarkKey, score, rank)
+
+	log.Debugf("latest read rank, key: %v, score: %v, rank: %v", readMarkKey, score, rank)
 	return rank
 }
 
 // todo,存score值
 func SetReadIndex(userId, feedId int, index int64) {
 	// get score by rank
-	//ZRANGE
-	//ZSCORE
+	feedNewsKey := FeedNewsKeyPrefix + strconv.Itoa(feedId)
+	userFeedReadIndexKey := userFeedLatestReadIndex + strconv.Itoa(userId) + ":" + strconv.Itoa(feedId)
+	score := redisx.GetScoreByRank(feedNewsKey, index)
 
-	key := userFeedLatestReadIndex + strconv.Itoa(userId) + ":" + strconv.Itoa(feedId)
-	score := redisx.GetScoreByRank(key, index)
-
-	_, _ = redisx.GetConn().Do("SET", key, score)
-	log.Debugf("reset read index, index:%v", index)
+	_, _ = redisx.GetConn().Do("SET", userFeedReadIndexKey, score)
+	log.Debugf("set read index, score:%v", score)
 }
 
 func FindIndexById(feedId int, newsId string) int64 {

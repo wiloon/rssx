@@ -11,7 +11,6 @@ import (
 	"rssx/feed"
 	"rssx/feed/news/list"
 	"rssx/news"
-	"rssx/rss"
 	"strconv"
 )
 
@@ -29,12 +28,12 @@ func (server HttpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, v := range tmp {
 		count := list.Count(int(v.Id))
 		index := list.GetLatestReadIndex(0, int(v.Id))
-		unread := count - index
+		unread := count - index - 1
 		if unread < 0 {
 			unread = 0
 		}
 		v.Title = v.Title + " - " + strconv.Itoa(int(unread))
-
+		log.Debugf("feed list item: %v", v)
 		feeds = append(feeds, v)
 	}
 
@@ -139,13 +138,16 @@ func (server MarkReadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	feedId, _ := strconv.Atoi(r.Form.Get("feedId"))
 	log.Debugf("mark this page as read, feed id: %v", feedId)
 
-	// 缓存里最后的已读索引, todo, 删除后会变
 	readIndex := list.GetLatestReadIndex(userId, feedId)
 	// reset read index
-	newIndex := readIndex + list.PageSize  //新已读=旧值加每页数量
-	list.SetReadIndex(0, feedId, newIndex) //save
+	newIndex := readIndex + list.PageSize - 1 //新已读=旧值加每页数量
+	count := list.Count(feedId)
+	if newIndex > count {
+		newIndex = count - 1
+	}
+	log.Debugf("last read index: %v, new index: %v", readIndex, newIndex)
 
-	log.Debugf("set read index:  %v", newIndex)
+	list.SetReadIndex(0, feedId, newIndex) //save
 	// del read mark set,按feed删除
 	news.DelReadMark(0, feedId)
 
@@ -168,7 +170,7 @@ func main() {
 	//go rss.Sync()
 
 	//定时清理缓存
-	go rss.Gc()
+	//go rss.Gc()
 
 	dir := config.GetString("ui.path", "")
 	log.Info("ui path: ", dir)
