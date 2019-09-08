@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	config "github.com/wiloon/pingd-config"
-	"os"
+	"github.com/wiloon/pingd-log/logconfig"
 	"rssx/rss"
 
 	log "github.com/sirupsen/logrus"
@@ -18,6 +18,44 @@ import (
 const userId = 0
 
 type HttpServer struct {
+}
+
+func main() {
+	logconfig.Init()
+
+	log.Info("rssx starting...")
+
+	//同步新闻列表， rss源>redis
+	if !config.GetBool("rssx.dev-mode") {
+		go rss.Sync()
+	}
+
+	//定时清理缓存
+	go rss.Gc()
+
+	dir := config.GetString("ui.path", "")
+	log.Info("ui path: ", dir)
+	http.Handle("/", http.FileServer(http.Dir(dir)))
+
+	var server HttpServer
+	http.Handle("/api/feeds", server)
+
+	var newsListServer NewsListServer
+	http.Handle("/api/news-list", newsListServer)
+
+	var newsServer NewsServer
+	http.Handle("/api/news", newsServer)
+
+	var previousNewsServer PreviousNewsServer
+	http.Handle("/api/news-previous", previousNewsServer)
+
+	var markReadServer MarkReadServer
+	http.Handle("/api/mark-read", markReadServer)
+
+	port := config.GetString("rssx.port", "3000")
+	log.Info("rssx server listening:", port)
+	err := http.ListenAndServe(":"+port, nil)
+	handleErr(err)
 }
 
 // user feed list
@@ -60,6 +98,7 @@ func (server NewsListServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(jsonStr))
 }
 
+// 按feed取一页
 func loadNewsListByFeed(feedId int) []news.News {
 	var newsList []news.News
 	if feedId == -1 {
@@ -137,16 +176,14 @@ type MarkReadServer struct {
 func (server MarkReadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	feedId, _ := strconv.Atoi(r.Form.Get("feedId"))
-	log.Debugf("mark this page as read, feed id: %v", feedId)
-
 	readIndex := list.GetLatestReadIndex(userId, feedId)
 	// reset read index
-	newIndex := readIndex + list.PageSize - 1 //新已读=旧值加每页数量
+	newIndex := readIndex + list.PageSize //新已读=旧值加每页数量
 	count := list.Count(feedId)
 	if newIndex > count {
 		newIndex = count - 1
 	}
-	log.Debugf("last read index: %v, new index: %v", readIndex, newIndex)
+	log.Infof("mark page as read, feed id: %v,  last read index: %v, new index: %v", feedId, readIndex, newIndex)
 
 	list.SetReadIndex(0, feedId, newIndex) //save
 	// del read mark set,按feed删除
@@ -156,45 +193,6 @@ func (server MarkReadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	newsList := loadNewsListByFeed(feedId)
 	jsonStr, _ := json.Marshal(newsList)
 	_, _ = w.Write([]byte(jsonStr))
-}
-
-func main() {
-	logconfig.Init()
-	log.SetFormatter(&log.TextFormatter{})
-	log.SetOutput(os.Stdout)
-	log.SetLevel(log.DebugLevel)
-
-	log.Info("rssx starting...")
-
-	//同步新闻列表， rss源>redis
-	go rss.Sync()
-
-	//定时清理缓存
-	go rss.Gc()
-
-	dir := config.GetString("ui.path", "")
-	log.Info("ui path: ", dir)
-	http.Handle("/", http.FileServer(http.Dir(dir)))
-
-	var server HttpServer
-	http.Handle("/api/feeds", server)
-
-	var newsListServer NewsListServer
-	http.Handle("/api/news-list", newsListServer)
-
-	var newsServer NewsServer
-	http.Handle("/api/news", newsServer)
-
-	var previousNewsServer PreviousNewsServer
-	http.Handle("/api/news-previous", previousNewsServer)
-
-	var markReadServer MarkReadServer
-	http.Handle("/api/mark-read", markReadServer)
-
-	port := config.GetString("rssx.port", "3000")
-	log.Info("rssx server listening:", port)
-	err := http.ListenAndServe(":"+port, nil)
-	handleErr(err)
 }
 
 func handleErr(e error) {
