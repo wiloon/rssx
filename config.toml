@@ -17,3 +17,8 @@ duration=60
 [news]
 expire-time="-720h"
 gc-duration="24h"
+
+[log]
+level="info"
+path="/data/rssx/logs/"
+file-name="rssx.log"

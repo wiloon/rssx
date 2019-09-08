@@ -159,6 +159,7 @@ func (server MarkReadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	logconfig.Init()
 	log.SetFormatter(&log.TextFormatter{})
 	log.SetOutput(os.Stdout)
 	log.SetLevel(log.DebugLevel)
