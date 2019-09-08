@@ -1,5 +1,6 @@
 [rssx]
 port="3000"
+dev-mode=true
 
 [mysql]
 address="nuc:3306"

@@ -35,8 +35,8 @@ func FindNewsListByUserFeed(userId, feedId int) []string {
 	latestReadIndex := GetLatestReadIndex(userId, feedId)
 	key := NewsListKey(feedId)
 
-	newsList = FindNewsListByRange(key, latestReadIndex+1, latestReadIndex+PageSize-1)
-	log.Infof("find news list by feed,read index: %v, news size: %v", latestReadIndex, len(newsList))
+	newsList = FindNewsListByRange(key, latestReadIndex+1, latestReadIndex+PageSize)
+	log.Infof("find news list by feed,read index: %v, list size: %v", latestReadIndex, len(newsList))
 	return newsList
 }
 
@@ -102,6 +102,7 @@ func GetLatestReadIndex(userId, feedId int) int64 {
 		feedNewsKey := FeedNewsKeyPrefix + strconv.Itoa(feedId)
 		rank = redisx.GetRankByScore(feedNewsKey, int64(score))
 	} else {
+		// 取不到score时
 		rank = -1
 	}
 
