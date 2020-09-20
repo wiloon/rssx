@@ -1,12 +1,12 @@
 [rssx]
 port="3000"
-dev-mode=true
+dev-mode=false
 
 [mysql]
-address="nuc:3306"
+address="192.168.50.114:3306"
 
 [redis]
-address="nuc:6379"
+address="192.168.50.114:6379"
 
 [ui]
 path="/home/wiloon/projects/rssx/rssx-client/dist/"
@@ -20,6 +20,6 @@ expire-time="-720h"
 gc-duration="24h"
 
 [log]
-level="info"
+level="debug"
 path="/data/rssx/logs/"
 file-name="rssx.log"
