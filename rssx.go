@@ -38,7 +38,7 @@ func main() {
 	http.Handle("/", http.FileServer(http.Dir(dir)))
 
 	var server HttpServer
-	http.Handle("/api/feeds", server)
+	http.Handle("/feeds", server)
 
 	var newsListServer NewsListServer
 	http.Handle("/api/news-list", newsListServer)
