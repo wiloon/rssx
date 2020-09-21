@@ -41,10 +41,10 @@ func main() {
 	http.Handle("/feeds", server)
 
 	var newsListServer NewsListServer
-	http.Handle("/api/news-list", newsListServer)
+	http.Handle("/news-list", newsListServer)
 
 	var newsServer NewsServer
-	http.Handle("/api/news", newsServer)
+	http.Handle("/news", newsServer)
 
 	var previousNewsServer PreviousNewsServer
 	http.Handle("/api/news-previous", previousNewsServer)
