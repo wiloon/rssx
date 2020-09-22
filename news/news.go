@@ -97,7 +97,7 @@ func (n *News) LoadReadFlag(userId int) {
 	log.Debugf("read mark, news id: %v, title: %v", n.Id, n.Title)
 }
 func (n *News) Load() {
-	result, err := redis.Values(redisx.GetConn().Do("HMGET", newsKeyPrefix+n.Id, Title, Url, Description, Score))
+	result, err := redis.Values(redisx.GetConn().Do("HMGET", newsKeyPrefix+n.Id, Title, Url, Description, Score, PubDate))
 	if err != nil {
 		log.Info(err.Error())
 	}
@@ -107,6 +107,7 @@ func (n *News) Load() {
 	n.Description = string(result[2].([]byte))
 	score, _ := strconv.Atoi(string(result[3].([]byte)))
 	n.Score = int64(score)
+	n.PubDate = string(result[4].([]byte))
 
 }
 
