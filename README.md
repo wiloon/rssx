@@ -129,8 +129,17 @@ INSERT INTO `user_feed` (`user_id`, `feed_id`) VALUES
 	(0, 11),
 	(1, 0),
 	(1, 1);
+
+CREATE USER user0 IDENTIFIED BY 'password0';
+grant all privileges on rssx.* to user0@'%' identified by 'password0';
 ```
 
 - redis
 
 
+### deploy
+```bash
+podman run -d --name rssx-server -p 3000:3000/tcp -v /etc/localtime:/etc/localtime:ro -v rssx-data:/data/rssx repo0:2.2.0
+
+
+```
