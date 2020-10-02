@@ -2,15 +2,15 @@ package redisx
 
 import (
 	"github.com/garyburd/redigo/redis"
-	log "github.com/sirupsen/logrus"
 	"github.com/wiloon/pingd-config"
+	log "github.com/wiloon/pingd-log/logconfig/zaplog"
 	"strconv"
 )
 
 var conn redis.Conn
 
 func init() {
-	connect()
+	// connect()
 }
 
 func ZADD(key string, score int64, member string) {

@@ -2,16 +2,15 @@ package main
 
 import (
 	"encoding/json"
-	config "github.com/wiloon/pingd-config"
-	"github.com/wiloon/pingd-log/logconfig"
-	"rssx/rss"
 
-	log "github.com/sirupsen/logrus"
+	config "github.com/wiloon/pingd-config"
+	log "github.com/wiloon/pingd-log/logconfig/zaplog"
 	"net/http"
 	"rssx/data"
 	"rssx/feed"
 	"rssx/feed/news/list"
 	"rssx/news"
+	"rssx/rss"
 	"strconv"
 )
 
@@ -21,9 +20,7 @@ type HttpServer struct {
 }
 
 func main() {
-	logconfig.Init()
-
-	log.Info("rssx starting...")
+	log.Init()
 
 	//同步新闻列表， rss源>redis
 	if !config.GetBool("rssx.dev-mode") {
@@ -34,7 +31,7 @@ func main() {
 	go rss.Gc()
 
 	dir := config.GetString("ui.path", "")
-	log.Info("ui path: ", dir)
+
 	http.Handle("/", http.FileServer(http.Dir(dir)))
 
 	var server HttpServer

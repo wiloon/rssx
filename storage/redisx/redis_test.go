@@ -5,8 +5,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"github.com/satori/go.uuid"
-	log "github.com/sirupsen/logrus"
 	config "github.com/wiloon/pingd-config"
+	log "github.com/wiloon/pingd-log/logconfig/zaplog"
 	"os"
 	"rssx/utils"
 	"testing"
@@ -47,7 +47,6 @@ func TestMd5(t *testing.T) {
 }
 
 func Test0(t *testing.T) {
-	log.SetLevel(log.DebugLevel)
 	log.Infof("start...")
 	_ = os.Setenv("app_config", "/tmp/rssx-config-toml")
 	config.LoadLocalConfig("rssx-config-toml")

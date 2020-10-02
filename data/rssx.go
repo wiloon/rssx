@@ -1,29 +1,33 @@
 package data
 
 import (
-	log "github.com/sirupsen/logrus"
 	"github.com/wiloon/pingd-config"
 	"github.com/wiloon/pingd-data/mysql"
+	log "github.com/wiloon/pingd-log/logconfig/zaplog"
 	"rssx/feed"
 	"rssx/news"
 	"time"
 )
 
-var rssx mysql.Database
+var rssx *mysql.Database
 
 func init() {
-	address := config.GetString("mysql.address", "127.0.0.1:3306")
-	user := config.GetString("mysql.user", "user0")
-	password := config.GetString("mysql.password", "password0")
-	mysqlConfig := mysql.Config{DatabaseName: "rssx", Address: address, Username: user, Password: password}
-	rssx = mysql.NewDatabase(mysqlConfig)
 
 }
-
+func Rssx() *mysql.Database {
+	if rssx == nil {
+		address := config.GetString("mysql.address", "127.0.0.1:3306")
+		user := config.GetString("mysql.user", "user0")
+		password := config.GetString("mysql.password", "password0")
+		mysqlConfig := mysql.Config{DatabaseName: "rssx", Address: address, Username: user, Password: password}
+		rssx = mysql.NewDatabase(mysqlConfig)
+	}
+	return rssx
+}
 func FindUserFeeds(userId int) []feed.Feed {
 	stmt := "select f.feed_id,f.title from user_feed uf join feed f on uf.feed_id=f.feed_id where user_id=?"
 
-	result := rssx.Find(stmt, []interface{}{userId}...)
+	result := Rssx().Find(stmt, []interface{}{userId}...)
 	var feeds []feed.Feed
 	for _, v := range result {
 		log.Info(v)
@@ -162,13 +166,13 @@ func FindNextNews(userId, newsId int64) news.News {
 	return newsRtn
 }
 func SaveNews(feedId int64, title, url, description string, pubDate time.Time, guid string) {
-	stmt := "INSERT news SET  feed_id=?,title=?,url=?,description=?,pub_date=?,guid=?"
-	rssx.Save(stmt, []interface{}{feedId, title, url, description, pubDate, guid}...)
+	//stmt := "INSERT news SET  feed_id=?,title=?,url=?,description=?,pub_date=?,guid=?"
+	//Rssx().Save(stmt, []interface{}{feedId, title, url, description, pubDate, guid}...)
 }
 
 func FindFeeds() []feed.Feed {
 	stmt := "select feed_id,title,url from feed where deleted=?"
-	result := rssx.Find(stmt, []interface{}{0}...)
+	result := Rssx().Find(stmt, []interface{}{0}...)
 	var feeds []feed.Feed
 	for _, v := range result {
 		feeds = append(feeds, feed.Feed{
@@ -182,7 +186,7 @@ func FindFeeds() []feed.Feed {
 
 func MarkNewsRead(userId, newsId int64) {
 	stmt := "INSERT news_read_mark SET  user_id=?,news_id=?"
-	rssx.Save(stmt, []interface{}{userId, newsId}...)
+	Rssx().Save(stmt, []interface{}{userId, newsId}...)
 }
 
 func FindLatestNewsByFeed(feedId int64) news.News {
