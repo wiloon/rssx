@@ -1,6 +1,6 @@
 [rssx]
 port="3000"
-dev-mode=false
+dev-mode=true
 
 [mysql]
 address="mysql.wiloon.com:3306"

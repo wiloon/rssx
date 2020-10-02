@@ -1,9 +1,9 @@
 # rssx
 
 ## redis key
-### 所有 newsid， 按时间排序的
+### 某一个feed的 所有 news id， 按时间排序的
 key: feed_news:feedId0
-type: sort set
+type: sort set， zset
 value: newsId
 
 ### 新闻内容

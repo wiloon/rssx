@@ -1,7 +1,7 @@
 package list
 
 import (
-	log "github.com/sirupsen/logrus"
+	log "github.com/wiloon/pingd-log/logconfig/zaplog"
 	"rssx/feed"
 	"rssx/storage/redisx"
 	"strconv"

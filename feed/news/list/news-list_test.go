@@ -2,8 +2,8 @@ package list
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	config "github.com/wiloon/pingd-config"
+	log "github.com/wiloon/pingd-log/logconfig/zaplog"
 	"os"
 	"rssx/storage/redisx"
 	"testing"
