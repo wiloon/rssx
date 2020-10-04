@@ -34,36 +34,6 @@ value: newsId
 ### 移除有序集中，指定排名(rank)区间内的所有成员
 ### 移除有序集中，指定分数（score）区间内的所有成员
 
-
-```sql
-
-DROP TABLE IF EXISTS `news`;
-CREATE TABLE IF NOT EXISTS `news` (
-  `news_id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `feed_id` bigint(20) DEFAULT NULL,
-  `title` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `url` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `description` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
-  `pub_date` datetime DEFAULT NULL,
-  `guid` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  PRIMARY KEY (`news_id`),
-  KEY `guid` (`guid`(191))
-) ENGINE=InnoDB AUTO_INCREMENT=293 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
-DROP TABLE IF EXISTS `news_read_mark`;
-CREATE TABLE IF NOT EXISTS `news_read_mark` (
-  `user_id` bigint(20) DEFAULT NULL,
-  `news_id` bigint(20) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
-
-```
- 
-
-
 ### 部署
 #### mysql
 ```sql
