@@ -3,7 +3,9 @@ package list
 import (
 	log "github.com/wiloon/pingd-log/logconfig/zaplog"
 	"rssx/feed"
+	"rssx/news"
 	"rssx/storage/redisx"
+	"rssx/user"
 	"strconv"
 )
 
@@ -85,12 +87,12 @@ func feedNewsKey(feedId int) string {
 const userFeedLatestReadIndex string = "read_index:"
 
 /* todo, 按score取index
-redis里保存 score, 取位置时先取score再用score取member,再用member取位置   -_-!!
+redis里保存 score, 取最新的未读索引时时先取score再用score取member,再用member取位置   -_-!!
 */
 func GetLatestReadIndex(userId, feedId int) int64 {
 	score := 0
-	readMarkKey := userFeedLatestReadIndex + strconv.Itoa(userId) + ":" + strconv.Itoa(feedId)
-	r, err := redisx.GetConn().Do("GET", readMarkKey)
+	latestReadIndexKey := userFeedLatestReadIndex + strconv.Itoa(userId) + ":" + strconv.Itoa(feedId)
+	r, err := redisx.GetConn().Do("GET", latestReadIndexKey)
 	if err != nil {
 		log.Info(err.Error())
 	}
@@ -98,7 +100,7 @@ func GetLatestReadIndex(userId, feedId int) int64 {
 	if r != nil {
 		b := r.([]byte)
 		i := string(b)
-		score, _ = strconv.Atoi(i)
+		score, _ = strconv.Atoi(i) // score
 		feedNewsKey := FeedNewsKeyPrefix + strconv.Itoa(feedId)
 		rank = redisx.GetRankByScore(feedNewsKey, int64(score))
 	} else {
@@ -106,7 +108,7 @@ func GetLatestReadIndex(userId, feedId int) int64 {
 		rank = -1
 	}
 
-	log.Debugf("latest read rank, key: %v, score: %v, rank: %v", readMarkKey, score, rank)
+	log.Debugf("latest read rank, key: %v, score: %v, rank: %v", latestReadIndexKey, score, rank)
 	return rank
 }
 
@@ -149,4 +151,28 @@ func Count(feedId int) int64 {
 	}
 	log.Debugf("feed: %v, news count: %v", feedId, count)
 	return count
+}
+
+// 按feed取一页
+func LoadNewsListByFeed(feedId int) []news.News {
+	var newsList []news.News
+	if feedId == -1 {
+		// find all news for all user feeds
+		//	newsList = data.FindAllNewsForUser(user.DefaultId)
+	} else {
+		// by feed id
+		newsIds := FindNewsListByUserFeed(user.DefaultId, feedId)
+		for _, v := range newsIds {
+			n := news.New(v)
+			n.FeedId = int64(feedId)
+			n.LoadTitle()
+			n.LoadReadFlag(0)
+			// calculate unread count
+
+			newsList = append(newsList, *n)
+			log.Debugf("append article: %v", n.Title)
+		}
+	}
+	log.Debugf("new list size: %v", len(newsList))
+	return newsList
 }
