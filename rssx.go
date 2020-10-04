@@ -35,8 +35,9 @@ func main() {
 	router.GET("/feeds", LoadFeedList)
 	router.GET("/news-list", LoadNewsList)
 	router.GET("/news", LoadNews)
-	router.GET("/news-previous", PreviousNews)
-	router.GET("/mark-read", MarkReadNews)
+	router.GET("/previous-news", PreviousNews)
+	router.GET("/next-news", PreviousNews)
+	router.GET("/mark-read", MarkWholePageAsRead)
 
 	err := router.Run()
 	handleErr(err)
@@ -50,7 +51,7 @@ func handleErr(e error) {
 	}
 }
 
-func MarkReadNews(c *gin.Context) {
+func MarkWholePageAsRead(c *gin.Context) {
 
 	feedId, _ := strconv.Atoi(c.Query("feedId"))
 	readIndex := list.GetLatestReadIndex(user.DefaultId, feedId)
@@ -71,30 +72,28 @@ func MarkReadNews(c *gin.Context) {
 	c.JSON(200, newsList)
 }
 func PreviousNews(c *gin.Context) {
-	currentNewsId := c.Query("currentId")
+	currentNewsId := c.Query("newsIId")
 	feedId, _ := strconv.Atoi(c.Query("feedId"))
 	log.Debugf(" load previous news feed id:%v, news id:%v", feedId, currentNewsId)
 	index := list.FindIndexById(feedId, currentNewsId)
 	newsIds := list.FindNewsListByRange(list.NewsListKey(feedId), index-1, index-1)
 	previousNewsId := newsIds[0]
-	n := news.New(previousNewsId)
-	n.FeedId = int64(feedId)
-	n.Load()
+	previousNews := news.New(previousNewsId)
+	previousNews.FeedId = int64(feedId)
+	previousNews.Load()
 	nextNewsId := list.FindNextId(feedId, previousNewsId)
-	n.NextId = nextNewsId
-	c.JSON(200, n)
+	previousNews.NextId = nextNewsId
+	c.JSON(200, previousNews)
 
 }
 func LoadNews(c *gin.Context) {
-
-	newsId := c.Query("id")
 	feedId, _ := strconv.Atoi(c.Query("feedId"))
-	log.Debugf(" load news feed id:%v, news id:%v", feedId, newsId)
+	newsId := c.Query("id")
 
 	n := news.New(newsId)
 	n.FeedId = int64(feedId)
 	n.Load()
-	log.Info("news:" + n.Title)
+	log.Debugf(" load one news, feed id:%v, news id:%v, title: %s", feedId, newsId, n.Title)
 
 	nextNewsId := list.FindNextId(feedId, newsId)
 	n.NextId = nextNewsId
