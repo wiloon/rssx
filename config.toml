@@ -1,15 +1,11 @@
 [rssx]
-port="3000"
-dev-mode=true
+dev-mode=false
 
 [mysql]
 address="mysql.wiloon.com:3306"
 
 [redis]
 address="redis.wiloon.com:6379"
-
-[ui]
-path="/home/wiloon/projects/rssx/rssx-client/dist/"
 
 [sync]
 # minute
