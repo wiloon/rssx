@@ -41,7 +41,7 @@ func main() {
 
 	err := router.Run()
 	handleErr(err)
-
+	log.Info("rssx started and listening default port of gin")
 	utils.WaitSignals()
 }
 

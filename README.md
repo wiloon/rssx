@@ -109,7 +109,12 @@ grant all privileges on rssx.* to user0@'%' identified by 'password0';
 
 ### deploy
 ```bash
-podman run -d --name rssx-server -p 3000:3000/tcp -v /etc/localtime:/etc/localtime:ro -v rssx-data:/data/rssx repo0:2.2.0
+podman run -d \
+--name rssx-server \
+-p 3000:8080/tcp \
+-v /etc/localtime:/etc/localtime:ro \
+-v rssx-data:/data/rssx \
+registry.cn-qingdao.aliyuncs.com/pingd/repo0:x.x.x
 
 
 ```
