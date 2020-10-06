@@ -50,7 +50,7 @@ func Gc() {
 func Sync() {
 	duration := time.Minute * time.Duration(config.GetInt("sync.duration"))
 	ticker := time.NewTicker(duration)
-	for ; true; <-ticker.C {
+	for range ticker.C {
 		//find all feeds
 		feeds := data.FindFeeds()
 		for _, feed := range feeds {
@@ -62,7 +62,15 @@ func Sync() {
 
 func SyncFeed(feed feed.Feed) {
 	log.Info("sync feed:", feed.Url)
-	result, err := http.Get(feed.Url)
+	client := &http.Client{}
+	request, err := http.NewRequest("GET", feed.Url, nil)
+	if err != nil {
+		log.Info("failed to sync feed:", feed)
+		return
+	}
+	request.Header.Add("user-agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.30 Safari/537.36")
+	result, err := client.Do(request)
+
 	if err != nil {
 		log.Info("failed to sync feed:", feed)
 		return
