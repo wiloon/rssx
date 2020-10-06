@@ -49,13 +49,11 @@ CREATE TABLE IF NOT EXISTS `feed` (
 
 DELETE FROM `feed`;
 INSERT INTO `feed` (`feed_id`, `title`, `url`, `deleted`) VALUES
-	(0, 'OS China', 'http://www.oschina.net/news/rss', 0),
+	(0, 'OS China', 'https://www.oschina.net/news/rss', 0),
 	(1, 'InfoQ', 'http://www.infoq.com/cn/feed', 0),
-	(2, '科学松鼠会', 'http://songshuhui.net/feed', 0),
 	(3, 'CoolShell', 'http://coolshell.cn/feed', 0),
 	(4, 'Solidot', 'http://feeds.feedburner.com/solidot', 0),
 	(5, 'Autoblog', 'http://www.autoblog.com/rss.xml', 0),
-	(6, 'Leica', 'http://www.leica.org.cn/feed.php', 0),
 	(7, 'Engadget', 'http://cn.engadget.com/rss.xml', 0),
 	(8, 'Infozm', 'http://feed43.com/infzmnews.xml', 0),
 	(9, 'huxiu', 'https://www.huxiu.com/rss/0.xml', 0),
@@ -113,7 +111,7 @@ podman run -d \
 --name rssx-server \
 -p 3000:8080/tcp \
 -v /etc/localtime:/etc/localtime:ro \
--v rssx-data:/data/rssx \
+-v rssx-logs:/data/rssx/logs \
 registry.cn-qingdao.aliyuncs.com/pingd/repo0:x.x.x
 
 
