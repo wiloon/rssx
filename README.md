@@ -11,7 +11,12 @@ key: news:newsId0
 type: hash
 value: 新闻内容， 数据量最大
 
-### 已读索引，整页加载某个feed时使用
+## 记录用户阅读位置
+用已读索引和已读集合记录用户阅读位置
+已读索引 用于记录用户feed已读和未读的边界， 记录连续的已读未读位置
+已读集合 用于记录已读边界外，用户分散阅读的新闻，记录不连续的已读集合
+
+### 已读索引
 key: read_index:userId0:feedId0
 type: string
 value: feed_news（zset）的score值

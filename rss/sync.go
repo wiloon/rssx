@@ -112,7 +112,16 @@ func SyncFeed(feed feed.Feed) {
 		if list.FindIndexById(int(feed.Id), newsId) == -1 {
 			newsList.AppendNews(score, newsId)
 			log.Debugf("score:%v, news id:%v", score, newsId)
-			oneNews := news.News{Id: newsId, FeedId: int64(feed.Id), Guid: guid, Score: score, Title: v.Title, Description: v.Description, Url: url, PubDate: v.PubDate}
+			oneNews := news.News{
+				Id:          newsId,
+				FeedId:      feed.Id,
+				Guid:        guid,
+				Score:       score,
+				Title:       v.Title,
+				Description: v.Description,
+				Url:         url,
+				PubDate:     v.PubDate,
+			}
 			oneNews.Save()
 		}
 

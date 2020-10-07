@@ -72,7 +72,7 @@ func (n *News) IsRead(userId int) bool {
 	read := false
 	readMarkKey := newsReadMark + strconv.Itoa(userId) + ":" + strconv.Itoa(int(n.FeedId))
 	r, _ := redisx.GetConn().Do("SISMEMBER", readMarkKey, n.Id)
-	if r.(int64) == 1 {
+	if r != nil && r.(int64) == 1 {
 		read = true
 	}
 	log.Debugf("check news is read, read flag key: %v, news id: %v, read flag :%v", readMarkKey, n.Id, read)
@@ -80,9 +80,6 @@ func (n *News) IsRead(userId int) bool {
 }
 
 func (n *News) MarkRead(userId int) {
-	// check to update user read index or read user read set
-	// compare current index and last read index
-
 	_, _ = redisx.GetConn().Do("SADD", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(n.FeedId)), n.Id)
 	log.Debugf("mark news as read, news id: %v", n.Id)
 }
@@ -91,7 +88,9 @@ const newsKeyPrefix string = "news:"
 
 func (n *News) LoadTitle() {
 	result, _ := redis.Values(redisx.GetConn().Do("HMGET", newsKeyPrefix+n.Id, Title))
-	n.Title = string(result[0].([]byte))
+	if result != nil && len(result) > 0 {
+		n.Title = string(result[0].([]byte))
+	}
 }
 func (n *News) LoadReadFlag(userId int) {
 
