@@ -8,7 +8,6 @@ require (
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/pelletier/go-toml v1.8.1 // indirect
 	github.com/satori/go.uuid v1.2.0
-	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/wiloon/pingd-config v0.0.0-20201005040120-6f74b7b80a31
 	github.com/wiloon/pingd-data v0.0.0-20201005043801-942c345f636a
 	github.com/wiloon/pingd-log v0.0.0-20201005042500-c2b7a58bcd3f
