@@ -86,6 +86,10 @@ func PreviousNews(c *gin.Context) {
 	c.JSON(200, previousNews)
 
 }
+
+/*
+	LoadNews: load one news
+*/
 func LoadNews(c *gin.Context) {
 	feedId, _ := strconv.Atoi(c.Query("feedId"))
 	newsId := c.Query("id")

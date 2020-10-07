@@ -80,6 +80,9 @@ func (n *News) IsRead(userId int) bool {
 }
 
 func (n *News) MarkRead(userId int) {
+	// check to update user read index or read user read set
+	// compare current index and last read index
+
 	_, _ = redisx.GetConn().Do("SADD", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(n.FeedId)), n.Id)
 	log.Debugf("mark news as read, news id: %v", n.Id)
 }
