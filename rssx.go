@@ -50,7 +50,11 @@ func handleErr(e error) {
 	}
 }
 
+<<<<<<< HEAD
 // MarkWholePageAsRead 标记整页新闻为已读。
+=======
+// MarkWholePageAsRead 标记整页新闻为已读
+>>>>>>> dc3c267651c63e597f53559c323a5696f4813dc0
 func MarkWholePageAsRead(c *gin.Context) {
 	feedID, _ := strconv.Atoi(c.Query("feedId"))
 	readIndex := list.GetLatestReadIndex(user.DefaultId, feedID)
