@@ -119,5 +119,6 @@ podman run -d \
 -v rssx-logs:/data/rssx/logs \
 registry.cn-qingdao.aliyuncs.com/pingd/repo0:x.x.x
 
+podman stop rssx && podman rm rssx && podman run -d --name rssx -p 30090:80/tcp -v /etc/localtime:/etc/localtime:ro -v rssx-web-data:/var/log/nginx registry.cn-qingdao.aliyuncs.com/pingd/rssx:1.0.7 && podman ps
 
 ```
