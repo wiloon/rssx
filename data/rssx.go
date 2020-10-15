@@ -28,11 +28,9 @@ func FindUserFeeds(userId int) []feed.Feed {
 	result := Rssx().Find(stmt, []interface{}{userId}...)
 	var feeds []feed.Feed
 	for _, v := range result {
-		log.Info(v)
-
 		feeds = append(feeds, feed.Feed{Id: v["feed_id"].(int64), Title: string(v["title"].([]uint8))})
-
 	}
+	log.Infof("user feeds size: %v", len(feeds))
 	return feeds
 }
 

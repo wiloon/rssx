@@ -63,11 +63,15 @@ func GetNewsIdListByScore(key string, scoreStart, scoreEnd int64) []string {
 	if err != nil {
 		log.Error(err)
 	}
-	foo := r.([]interface{})
-	for _, v := range foo {
-		member := string(v.([]byte))
-		out = append(out, member)
+
+	if r != nil {
+		foo := r.([]interface{})
+		for _, v := range foo {
+			member := string(v.([]byte))
+			out = append(out, member)
+		}
 	}
+
 	return out
 }
 func GetScoreByRank(key string, rank int64) int64 {
