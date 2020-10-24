@@ -53,7 +53,7 @@ func GetRankByScore(key string, score int64) int64 {
 		t, _ := GetConn().Do("ZRANK", key, member)
 		rank = t.(int64)
 	}
-	log.Infof("get rank by score: score: %v, rank: %v", score, rank)
+	log.Infof("got rank by score, score: %v, rank: %v", score, rank)
 	return rank
 }
 

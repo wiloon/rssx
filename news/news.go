@@ -71,6 +71,7 @@ const newsReadMark string = "read_mark:"
 func (n *News) IsRead(userId int) bool {
 	read := false
 	readMarkKey := newsReadMark + strconv.Itoa(userId) + ":" + strconv.Itoa(int(n.FeedId))
+	log.Debugf("check news is read, read flag key: %v, news id: %v", readMarkKey, n.Id)
 	r, _ := redisx.GetConn().Do("SISMEMBER", readMarkKey, n.Id)
 	if r != nil && r.(int64) == 1 {
 		read = true
@@ -93,9 +94,7 @@ func (n *News) LoadTitle() {
 	}
 }
 func (n *News) LoadReadFlag(userId int) {
-
 	n.ReadFlag = n.IsRead(0)
-
 	log.Debugf("read mark, news id: %v, title: %v", n.Id, n.Title)
 }
 func (n *News) Load() {

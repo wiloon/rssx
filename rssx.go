@@ -89,6 +89,7 @@ func PreviousNews(c *gin.Context) {
 
 /*
 	LoadNews: load one news
+    按id加载一条新闻
 */
 func LoadNews(c *gin.Context) {
 	feedId, _ := strconv.Atoi(c.Query("feedId"))
@@ -97,12 +98,12 @@ func LoadNews(c *gin.Context) {
 	n := news.New(newsId)
 	n.FeedId = int64(feedId)
 	n.Load()
-	log.Debugf(" load one news, feed id:%v, news id:%v, title: %s", feedId, newsId, n.Title)
+	log.Debugf("load one news, feed id:%v, news id:%v, title: %s", feedId, newsId, n.Title)
 
 	nextNewsId := list.FindNextId(feedId, newsId)
 	n.NextId = nextNewsId
 
-	log.Info("show news:", n.Title, ", next:", n.NextId)
+	log.Info("show news:", n.Title, ", next id:", n.NextId)
 
 	// 加载新的一条新闻时要维护已读未读的边界 和 不连续的已读记录
 	// 用户当前已读索引
@@ -112,35 +113,43 @@ func LoadNews(c *gin.Context) {
 	n.MarkRead(0)
 	log.Debugf("currentUserReadIndex: %v, currentNewsIndex: %v", currentUserReadIndex, currentNewsIndex)
 
-	latestReadIndex := findNewestReadIndex(feedId, currentUserReadIndex)
-	log.Debugf("currentUserReadIndex: %v, latestReadIndex: %v", currentUserReadIndex, latestReadIndex)
-	if currentUserReadIndex == latestReadIndex {
+	nextUnReadIndex := findNextUserUnReadIndex(feedId, currentUserReadIndex)
+	log.Debugf("currentUserReadIndex: %v, nextUnReadIndex: %v", currentUserReadIndex, nextUnReadIndex)
+	if currentUserReadIndex == nextUnReadIndex {
 		// 已读位置不连续，记录到已读集合
 		n.MarkRead(0)
 	} else {
 		//已读新闻是连续的，直接维护已读位置边界
 		//更新用户已读索引
-		list.SetReadIndex(0, feedId, latestReadIndex)
+		list.SetReadIndex(0, feedId, nextUnReadIndex)
 	}
 	c.JSON(200, n)
 
 }
-func findNewestReadIndex(feedId int, newsIndex int64) int64 {
-	log.Debugf("findNewestReadIndex, feed id: %v, index: %v", feedId, newsIndex)
+
+/**
+找到用户下一个未读索引
+*/
+func findNextUserUnReadIndex(feedId int, currentNewsIndex int64) int64 {
+	log.Debugf("findNextUserUnReadIndex, feed id: %v, index: %v", feedId, currentNewsIndex)
 	var result int64
-	// 当前新闻的索引
-	currentNewsIndex := newsIndex
 	nextNewsIndex := currentNewsIndex + 1
 	nextNewsId := list.FinOneNewsByIndex(nextNewsIndex, feedId)
-	nextNews := news.New(nextNewsId)
-	nextNews.FeedId = int64(feedId)
-	if nextNews.IsRead(user.DefaultId) {
-		result = findNewestReadIndex(feedId, nextNewsIndex)
-	} else {
-		// 找到一条未读新闻，退出
+
+	if nextNewsId == "" {
 		result = currentNewsIndex
+	} else {
+		nextNews := news.New(nextNewsId)
+		nextNews.FeedId = int64(feedId)
+		if nextNews.IsRead(user.DefaultId) {
+			result = findNextUserUnReadIndex(feedId, nextNewsIndex)
+		} else {
+			// 找到一条未读新闻，退出
+			result = currentNewsIndex
+		}
 	}
-	log.Debugf("findNewestReadIndex, feed id: %v, index: %v, result: %v", feedId, newsIndex, result)
+
+	log.Debugf("findNextUserUnReadIndex, feed id: %v, index: %v, result: %v", feedId, currentNewsIndex, result)
 	return result
 }
 func checkIfAllPreviousNewsIsRead(feedId int, newsId string) bool {
