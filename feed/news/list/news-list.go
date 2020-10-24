@@ -50,6 +50,7 @@ func NewsListKey(feedId int) string {
 
 // 按索引取新闻列表
 func FindNewsListByRange(key string, start, end int64) []string {
+	log.Debugf("find news list by rang, start: %v, end: %v", start, end)
 	var newsidList []string
 
 	result, err := redisx.GetConn().Do("ZRANGE", key, start, end)
@@ -107,7 +108,7 @@ func FindPreviousNewsId(feedId int, newsId string) string {
 
 func feedNewsKey(feedId int) string {
 	key := FeedNewsKeyPrefix + strconv.Itoa(feedId)
-	log.Debugf("feed news key: %v", key)
+	log.Debugf("get key of feed news: %v", key)
 	return key
 }
 
@@ -120,6 +121,7 @@ const userFeedLatestReadIndex string = "read_index:"
 redis里保存 score, 取最新的未读索引时时先取score再用score取member,再用member取位置   -_-!!
 */
 func GetLatestReadIndex(userId, feedId int) int64 {
+	log.Debugf("get latest read index, user id: %v, feed id: %v", userId, feedId)
 	score := 0
 	latestReadIndexKey := userFeedLatestReadIndex + strconv.Itoa(userId) + ":" + strconv.Itoa(feedId)
 	r, err := redisx.GetConn().Do("GET", latestReadIndexKey)
@@ -145,6 +147,7 @@ func GetLatestReadIndex(userId, feedId int) int64 {
 // 更新已读索引
 // 存score值
 func SetReadIndex(userId, feedId int, index int64) {
+	log.Info("set read index, user id: %v, feed id: %v, index: %v", userId, feedId, index)
 	// get score by rank
 	feedNewsKey := FeedNewsKeyPrefix + strconv.Itoa(feedId)
 	userFeedReadIndexKey := userFeedLatestReadIndex + strconv.Itoa(userId) + ":" + strconv.Itoa(feedId)
