@@ -60,7 +60,8 @@ func MarkWholePageAsRead(c *gin.Context) {
 	if newIndex > count {
 		newIndex = count - 1
 	}
-	log.Infof("mark page as read, feed id: %v,  last read index: %v, new index: %v", feedId, readIndex, newIndex)
+	log.Infof("mark page as read, feed id: %v,  last read index: %v, new index: %v, list count: %v",
+		feedId, readIndex, newIndex, count)
 
 	list.SetReadIndex(0, feedId, newIndex) //save
 	// del read mark set,按feed删除
