@@ -153,6 +153,10 @@ func SetReadIndex(userId, feedId int, index int64) {
 	userFeedReadIndexKey := userFeedLatestReadIndex + strconv.Itoa(userId) + ":" + strconv.Itoa(feedId)
 	score := redisx.GetScoreByRank(feedNewsKey, index)
 
+	if score == 0 {
+		log.Warn("invalid score, ignore")
+		return
+	}
 	_, _ = redisx.GetConn().Do("SET", userFeedReadIndexKey, score)
 	log.Debugf("set read index, score:%v", score)
 }
