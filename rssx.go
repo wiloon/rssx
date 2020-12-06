@@ -57,7 +57,7 @@ func MarkWholePageAsRead(c *gin.Context) {
 	// reset read index
 	newIndex := readIndex + list.PageSize //新已读=旧值加每页数量
 	count := list.Count(feedId)
-	if newIndex > count {
+	if newIndex >= count {
 		newIndex = count - 1
 	}
 	log.Infof("mark page as read, feed id: %v,  last read index: %v, new index: %v, list count: %v",
