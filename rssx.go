@@ -18,7 +18,9 @@ func main() {
 	log.Init()
 
 	//同步新闻列表， rss源>redis
-	if !config.GetBool("rssx.dev-mode") {
+	syncAuto := config.GetBool("rssx.rss-sync-auto")
+	log.Infof("sync auto: %b", syncAuto)
+	if syncAuto {
 		go rss.Sync()
 	}
 
