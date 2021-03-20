@@ -50,7 +50,7 @@ func Gc() {
 func Sync() {
 	duration := time.Minute * time.Duration(config.GetInt("sync.duration"))
 	ticker := time.NewTicker(duration)
-	for range ticker.C {
+	for ; true; <-ticker.C {
 		log.Info("new sync start")
 		//find all feeds
 		feeds := data.FindFeeds()
