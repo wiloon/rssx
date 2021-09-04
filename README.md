@@ -43,6 +43,7 @@ value: newsId
 #### mysql
 ```sql
 CREATE DATABASE rssx DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;
+
 DROP TABLE IF EXISTS `feed`;
 CREATE TABLE IF NOT EXISTS `feed` (
   `feed_id` bigint(20) NOT NULL AUTO_INCREMENT,
@@ -77,8 +78,6 @@ INSERT INTO `user` (`user_id`, `name`, `create_time`) VALUES
 	(0, 'wiloon', '2017-12-07 22:10:49'),
 	(1, 'foo', '2017-12-09 13:16:15');
 
-
-
 DROP TABLE IF EXISTS `user_feed`;
 CREATE TABLE IF NOT EXISTS `user_feed` (
   `user_id` bigint(20) NOT NULL,
@@ -107,8 +106,10 @@ CREATE USER user0 IDENTIFIED BY 'password0';
 grant all privileges on rssx.* to user0@'%' identified by 'password0';
 ```
 
-- redis
+### redis
 
+### build
+    buildah bud -f Dockerfile -t rssx .
 
 ### deploy
 ```bash
@@ -117,7 +118,7 @@ podman run -d \
 -p 3000:8080/tcp \
 -v /etc/localtime:/etc/localtime:ro \
 -v rssx-logs:/data/rssx/logs \
-registry.cn-qingdao.aliyuncs.com/pingd/repo0:x.x.x
+localhost/rssx
 
 podman stop rssx-server && podman rm rssx-server && podman run -d --name rssx-server -p 3000:8080/tcp -v /etc/localtime:/etc/localtime:ro -v rssx-logs:/data/rssx/logs registry.cn-qingdao.aliyuncs.com/pingd/repo0:2.5.0 && podman ps
 
