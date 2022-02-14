@@ -3,8 +3,6 @@ package rss
 import (
 	"encoding/xml"
 	"fmt"
-	"github.com/wiloon/pingd-config"
-	log "github.com/wiloon/pingd-log/logconfig/zaplog"
 	"io/ioutil"
 	"net/http"
 	"rssx/data"
@@ -13,6 +11,8 @@ import (
 	"rssx/news"
 	"rssx/storage/redisx"
 	"rssx/utils"
+	"rssx/utils/config"
+	log "rssx/utils/logger"
 	"strconv"
 	"strings"
 	"time"

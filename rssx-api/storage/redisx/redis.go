@@ -2,8 +2,8 @@ package redisx
 
 import (
 	"github.com/garyburd/redigo/redis"
-	"github.com/wiloon/pingd-config"
-	log "github.com/wiloon/pingd-log/logconfig/zaplog"
+	"rssx/utils/config"
+	log "rssx/utils/logger"
 	"strconv"
 )
 

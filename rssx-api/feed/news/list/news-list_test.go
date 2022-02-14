@@ -2,10 +2,10 @@ package list
 
 import (
 	"fmt"
-	config "github.com/wiloon/pingd-config"
-	log "github.com/wiloon/pingd-log/logconfig/zaplog"
 	"os"
 	"rssx/storage/redisx"
+	"rssx/utils/config"
+	log "rssx/utils/logger"
 	"testing"
 	"time"
 )
