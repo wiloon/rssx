@@ -1,11 +1,11 @@
 package list
 
 import (
-	log "github.com/wiloon/pingd-log/logconfig/zaplog"
 	"rssx/feed"
 	"rssx/news"
 	"rssx/storage/redisx"
 	"rssx/user"
+	log "rssx/utils/logger"
 	"strconv"
 )
 

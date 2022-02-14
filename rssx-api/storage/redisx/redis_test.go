@@ -5,10 +5,10 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"github.com/satori/go.uuid"
-	config "github.com/wiloon/pingd-config"
-	log "github.com/wiloon/pingd-log/logconfig/zaplog"
 	"os"
 	"rssx/utils"
+	"rssx/utils/config"
+	log "rssx/utils/logger"
 	"testing"
 )
 

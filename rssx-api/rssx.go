@@ -2,20 +2,20 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	config "github.com/wiloon/pingd-config"
-	log "github.com/wiloon/pingd-log/logconfig/zaplog"
-	"github.com/wiloon/pingd-utils/utils"
 	"rssx/data"
 	"rssx/feed"
 	"rssx/feed/news/list"
 	"rssx/news"
 	"rssx/rss"
 	"rssx/user"
+	"rssx/utils"
+	"rssx/utils/config"
+	log "rssx/utils/logger"
 	"strconv"
 )
 
 func main() {
-	log.Init()
+	log.Init("console,file", "debug", "rssx")
 
 	//同步新闻列表， rss源>redis
 	syncAuto := config.GetBool("rssx.rss-sync-auto")

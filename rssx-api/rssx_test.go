@@ -1,9 +1,9 @@
 package main
 
 import (
-	log "github.com/wiloon/pingd-log/logconfig/zaplog"
 	"rssx/data"
 	"rssx/rss"
+	log "rssx/utils/logger"
 	"testing"
 )
 

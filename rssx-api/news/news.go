@@ -2,8 +2,8 @@ package news
 
 import (
 	"github.com/garyburd/redigo/redis"
-	log "github.com/wiloon/pingd-log/logconfig/zaplog"
 	"rssx/storage/redisx"
+	log "rssx/utils/logger"
 	"strconv"
 )
 

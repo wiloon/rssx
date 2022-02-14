@@ -1,10 +1,10 @@
 package data
 
 import (
-	"github.com/wiloon/pingd-config"
-	"github.com/wiloon/pingd-data/mysql"
-	log "github.com/wiloon/pingd-log/logconfig/zaplog"
 	"rssx/feed"
+	"rssx/utils/config"
+	log "rssx/utils/logger"
+	"rssx/utils/mysql"
 )
 
 var rssx *mysql.Database
