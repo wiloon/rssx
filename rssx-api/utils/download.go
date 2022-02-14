@@ -3,9 +3,8 @@ package utils
 import (
 	"net/http"
 
-	
-	"io/ioutil"
 	"fmt"
+	"io/ioutil"
 )
 
 func Download() {
