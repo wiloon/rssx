@@ -1,20 +1,23 @@
 <template>
-  <v-card
-    max-width="500"
-    class="mx-auto"
-  >
-    <v-list>
-      <v-list-item
-        v-for="item in items"
-        :key="item.Id"
-        v-on:click="feedClick"
-      >
-        <v-list-item-content v-bind:id="item.Id">
-          <v-list-item-title v-text="item.Title" v-bind:id="item.Id"></v-list-item-title>
-        </v-list-item-content>
-      </v-list-item>
-    </v-list>
-  </v-card>
+  <v-container>
+    <v-btn v-on:click="reload">Reload</v-btn>
+    <v-card
+      max-width="500"
+      class="mx-auto"
+    >
+      <v-list>
+        <v-list-item
+          v-for="item in items"
+          :key="item.Id"
+          v-on:click="feedClick"
+        >
+          <v-list-item-content v-bind:id="item.Id">
+            <v-list-item-title v-text="item.Title" v-bind:id="item.Id"></v-list-item-title>
+          </v-list-item-content>
+        </v-list-item>
+      </v-list>
+    </v-card>
+  </v-container>
 </template>
 
 <script lang="ts">
@@ -30,10 +33,13 @@ export default class FeedList extends Vue {
 
   feedClick (event: any): void {
     console.log(event.target.id)
-    this.$router.push({ path: 'feed-news-list', query: { feedId: event.target.id } })
+    this.$router.push({
+      path: 'feed-news-list',
+      query: { feedId: event.target.id }
+    })
   }
 
-  mounted () {
+  reload (): void {
     Axios
       .get('/feeds')
       .then(
@@ -42,6 +48,10 @@ export default class FeedList extends Vue {
           this.items = response.data
         }
       )
+  }
+
+  mounted () {
+    this.reload()
   }
 }
 </script>
