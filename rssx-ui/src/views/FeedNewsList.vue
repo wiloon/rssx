@@ -1,6 +1,7 @@
 <template>
   <v-container>
-    <v-btn color="primary" v-on:click="markRead">Mark Read</v-btn>
+    <v-btn v-on:click="back" style="margin-right: 10px">Back</v-btn>
+    <v-btn v-on:click="markRead">Mark Read</v-btn>
     <v-card
       max-width="500"
       class="mx-auto"
@@ -49,10 +50,8 @@ export default class FeedNewsList extends Vue {
       )
   }
 
-  newsClick (event: any): void {
-    console.log(event.target.id)
-    console.log(event.target.feedid)
-    this.$router.push({ path: 'news', query: { newsid: event.target.id, feedId: event.target.feedid } })
+  back (): void {
+    this.$router.push({ name: 'FeedList' })
   }
 
   mounted () {

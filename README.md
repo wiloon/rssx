@@ -1,15 +1,17 @@
 # rssx
 
+一个RSS阅读器
+
 ## redis key
 ### 某一个feed的 所有 news id， 按时间排序的
 key: feed_news:feedId0
 type: sort set， zset
 value: newsId
 
-### 新闻内容
+### 文章内容
 key: news:newsId0
 type: hash
-value: 新闻内容， 数据量最大
+value: 文章内容， 数据量最大
 
 ## 记录用户阅读位置
 用已读索引和已读集合记录用户阅读位置
