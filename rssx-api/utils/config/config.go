@@ -26,12 +26,17 @@ func LoadLocalConfig(configFileName string) {
 	defaultFileName = configFileName
 
 	configFilePath = configPath()
-	if !isFileExist(configFilePath) {
-		log.Println("conifg file not found:", configFilePath)
+	LoadConfigByPath(configFilePath)
+}
+
+func LoadConfigByPath(fullPath string) {
+	log.Printf("load config by path: %s\n", fullPath)
+	if !isFileExist(fullPath) {
+		log.Println("conifg file not found:", fullPath)
 		return
 	}
 
-	b, err := ioutil.ReadFile(configFilePath)
+	b, err := ioutil.ReadFile(fullPath)
 	if err != nil {
 		fmt.Print(err)
 	}
@@ -40,6 +45,7 @@ func LoadLocalConfig(configFileName string) {
 
 	conf, _ = toml.Load(str)
 }
+
 func configPath() string {
 	configPath := os.Getenv(sysEnvKeyAppConfig)
 	if strings.EqualFold(configPath, "") || !isFileExist(getConfigFilePath(configPath)) {
@@ -93,6 +99,10 @@ func GetString(key string, def string) string {
 
 func GetIntWithDefaultValue(key string, def int64) int64 {
 	var value int64
+	if conf == nil {
+		return def
+	}
+
 	k := conf.Get(key)
 	if k == nil {
 		value = def
