@@ -33,17 +33,3 @@ func FindUserFeeds(userId int) []feed.Feed {
 	log.Infof("user feeds size: %v", len(feeds))
 	return feeds
 }
-
-func FindFeeds() []feed.Feed {
-	stmt := "select feed_id,title,url from feed where deleted=?"
-	result := Rssx().Find(stmt, []interface{}{0}...)
-	var feeds []feed.Feed
-	for _, v := range result {
-		feeds = append(feeds, feed.Feed{
-			Id:    v["feed_id"].(int64),
-			Title: string(v["title"].([]uint8)),
-			Url:   string(v["url"].([]uint8)),
-		})
-	}
-	return feeds
-}
