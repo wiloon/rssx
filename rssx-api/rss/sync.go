@@ -23,7 +23,7 @@ func Gc() {
 	ticker := time.NewTicker(gcDuration)
 	for ; true; <-ticker.C {
 		// clear cache
-		//删除一段时间 之前 的数据。
+		// 删除一段时间 之前 的数据。
 		// 取一个月之前的score
 		expireTime := config.GetString("news.expire-time", "-720h")
 		d, _ := time.ParseDuration(expireTime)
@@ -55,6 +55,7 @@ func Sync() {
 		//find all feeds
 		feeds := data.FindFeeds()
 		for _, feed := range feeds {
+			// todo, goroutine
 			SyncFeed(feed)
 		}
 		log.Info("sync tick done")
