@@ -1,7 +1,7 @@
 <template>
   <v-container>
-    <v-btn v-on:click="back" style="margin-right: 10px">Back</v-btn>
-    <v-btn v-on:click="markRead">Mark Read</v-btn>
+    <v-btn v-on:click="back" style="margin-right: 10px" class="reload">Back</v-btn>
+    <v-btn v-on:click="markRead" class="reload">Mark Read</v-btn>
     <v-card
       max-width="500"
       class="mx-auto"
@@ -72,6 +72,8 @@ export default class FeedNewsList extends Vue {
 }
 </script>
 <style scoped lang="stylus">
+.reload
+  margin-bottom 5px;
 .read
   color gray
 

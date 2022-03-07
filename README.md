@@ -111,7 +111,29 @@ grant all privileges on rssx.* to user0@'%' identified by 'password0';
 ### redis
 
 ### build
-    buildah bud -f Dockerfile -t rssx .
+```bash
+cd /home/wiloon/projects/rssx/rssx-api
+CGO_ENABLED=0 GOOS=linux GOPROXY=https://goproxy.io go build -a -o rssx-api main.go
+buildah bud -t registry.wiloon.com/rssx-api:v0.0.1 .
+buildah push registry.wiloon.com/rssx-api:v0.0.1
+rm rssx-api
+ansible -i '192.168.50.100,' all -m shell -a 'podman pull registry.wiloon.com/rssx-api:v0.0.1'
+ansible -i '192.168.50.100,' all -m shell -a 'podman stop rssx-api'
+ansible -i '192.168.50.100,' all -m shell -a 'podman rm rssx-api'
+ansible -i '192.168.50.100,' all -m shell -a 'podman run -d --name rssx-api -p 3000:8080 -v /etc/localtime:/etc/localtime:ro -v rssx-logs:/data/rssx/logs registry.wiloon.com/rssx-api:v0.0.1'
+
+cd /home/wiloon/projects/rssx/rssx-ui
+yarn install
+yarn build
+buildah bud -t registry.wiloon.com/rssx-ui:v0.0.1 .
+buildah push registry.wiloon.com/rssx-ui:v0.0.1
+ansible -i '192.168.50.100,' all -m shell -a 'podman pull registry.wiloon.com/rssx-ui:v0.0.1'
+ansible -i '192.168.50.100,' all -m shell -a 'podman stop rssx-ui'
+ansible -i '192.168.50.100,' all -m shell -a 'podman rm rssx-ui'
+ansible -i '192.168.50.100,' all -m shell -a 'podman run -d --name rssx-ui -p 30090:80 -v /etc/localtime:/etc/localtime:ro -v rssx-ui-logs:/var/log/nginx registry.wiloon.com/rssx-ui:v0.0.1'
+
+```
+
 
 ### deploy
 ```bash

@@ -16,3 +16,4 @@
 osChina.xml
 *.log
 rssx-ui/node_modules
+**/dist

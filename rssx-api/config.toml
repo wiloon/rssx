@@ -1,5 +1,5 @@
 [rssx]
-rss-sync-auto=false
+rss-sync-auto=true
 
 [mysql]
 address="mysql.wiloon.com:3306"

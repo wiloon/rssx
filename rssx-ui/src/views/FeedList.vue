@@ -1,6 +1,6 @@
 <template>
   <v-container>
-    <v-btn v-on:click="reload">Reload</v-btn>
+    <v-btn v-on:click="reload" class="reload">Reload</v-btn>
     <v-card
       max-width="500"
       class="mx-auto"
@@ -55,3 +55,7 @@ export default class FeedList extends Vue {
   }
 }
 </script>
+<style scoped lang="stylus">
+.reload
+  margin-bottom 5px;
+</style>
