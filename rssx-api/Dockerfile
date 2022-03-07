@@ -1,11 +1,9 @@
-FROM golang:1.17 AS build
-ENV GO111MODULE on
-WORKDIR /workdir
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOPROXY=https://goproxy.io go build -a rssx.go
-
-FROM alpine AS prod
-COPY --from=build /workdir/rssx /data/rssx/
+FROM alpine:3.15.0 AS prod
+ARG APP_NAME=rssx-api
+COPY ${APP_NAME} /data/${APP_NAME}/${APP_NAME}
 COPY config.toml config.toml
-COPY config.toml /data/rssx/config.toml
-CMD ["/data/rssx/rssx"]
+COPY config.toml /data/${APP_NAME}/config.toml
+
+ENV APPLICATION_NAME ${APP_NAME}
+
+CMD "/data/${APPLICATION_NAME}/${APPLICATION_NAME}"

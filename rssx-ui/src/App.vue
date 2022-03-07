@@ -3,7 +3,6 @@
     <v-app-bar
       app
       dense
-      hide-on-scroll
     >
       <v-toolbar-title>RSSX</v-toolbar-title>
     </v-app-bar>

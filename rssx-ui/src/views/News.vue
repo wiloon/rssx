@@ -3,10 +3,10 @@
     fluid
   >
     <v-row no-gutters>
-      <v-col cols="1" sm="1">
+      <v-col cols="3" sm="1">
         <v-btn v-on:click="back">Back</v-btn>
       </v-col>
-      <v-col cols="8" sm="8">
+      <v-col cols="6" sm="8">
         <v-btn v-on:click="previousNews">Previous</v-btn>
       </v-col>
       <v-col cols="3" sm="3">
@@ -21,8 +21,6 @@
     >
       <v-list-item three-line>
         <v-list-item-content>
-          <div id="progress-div"><v-progress-linear indeterminate :active="progressActive" height="1"></v-progress-linear></div>
-
           <v-list-item-title class="headline mb-1" v-on:click="newsClick(items.Url)">
             {{ items.Title }}
           </v-list-item-title>
@@ -31,6 +29,21 @@
         </v-list-item-content>
       </v-list-item>
     </v-card>
+    <v-snackbar
+      v-model="snackbar"
+    >
+      nav...
+      <template v-slot:action="{ attrs }">
+        <v-btn
+          color="pink"
+          text
+          v-bind="attrs"
+          @click="snackbar = false"
+        >
+          Close
+        </v-btn>
+      </template>
+    </v-snackbar>
   </v-container>
 </template>
 
@@ -42,6 +55,7 @@ import Axios from 'axios'
   components: {}
 })
 export default class News extends Vue {
+  snackbar = false
   feedId = ''
   newsId = ''
   nextNewsId = ''
@@ -79,6 +93,7 @@ export default class News extends Vue {
 
   mounted () {
     console.log(this.$route.query)
+    this.snackbar = false
     this.loadOneNews(this.$route.query.feedid as string, this.$route.query.newsid as string)
   }
 
@@ -100,7 +115,7 @@ export default class News extends Vue {
 
   newsClick (url: string): void {
     console.log('click' + url)
-    this.progressActive = true
+    this.snackbar = true
     window.location.href = url
   }
 }

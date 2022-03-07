@@ -155,6 +155,7 @@ func findNextUserUnReadIndex(feedId int, currentNewsIndex int64) int64 {
 	log.Debugf("findNextUserUnReadIndex, feed id: %v, index: %v, result: %v", feedId, currentNewsIndex, result)
 	return result
 }
+
 func checkIfAllPreviousNewsIsRead(feedId int, newsId string) bool {
 	result := false
 	// 用户当前已读索引
