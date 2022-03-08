@@ -24,7 +24,6 @@ func Sync() {
 	for ; true; <-ticker.C {
 		log.Info("new sync start")
 		//find all feeds
-
 		feedList := feeds.DefaultFeeds{}
 		syncFeeds(&feedList)
 		log.Info("sync tick done")
@@ -33,10 +32,10 @@ func Sync() {
 
 func syncFeeds(rssFeeds feeds.RssFeeds) {
 	p, _ := ants.NewPoolWithFunc(2, syncOneFeed)
-	list := rssFeeds.GetAllFeedList()
-	for _, feed := range list {
-		log.Debugf("invoke ant pool, feed id: %d", feed.Id)
-		err := p.Invoke(feed)
+	feedList := rssFeeds.GetAllFeedList()
+	for _, oneFeed := range feedList {
+		log.Debugf("invoke ant pool, feed id: %d", oneFeed.Id)
+		err := p.Invoke(oneFeed)
 		if err != nil {
 			log.Error("failed to invoke feed sync")
 			return
