@@ -40,7 +40,7 @@ func main() {
 	router.GET("/previous-news", PreviousNews)
 	router.GET("/mark-read", MarkWholePageAsRead)
 
-	err := router.Run()
+	err := router.Run(":8080")
 	handleErr(err)
 	log.Info("rssx started and listening default port of gin")
 	utils.WaitSignals()

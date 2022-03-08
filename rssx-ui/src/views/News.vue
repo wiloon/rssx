@@ -30,7 +30,7 @@
       </v-list-item>
     </v-card>
     <v-snackbar
-      v-model="snackbar"
+      v-model="snackbar" timeout="500"
     >
       nav...
       <template v-slot:action="{ attrs }">
