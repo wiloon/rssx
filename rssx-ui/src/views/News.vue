@@ -32,7 +32,7 @@
     <v-snackbar
       v-model="snackbar" timeout="500"
     >
-      nav...
+      Opening...
       <template v-slot:action="{ attrs }">
         <v-btn
           color="pink"
