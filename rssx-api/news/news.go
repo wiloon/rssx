@@ -3,6 +3,7 @@ package news
 import (
 	"github.com/garyburd/redigo/redis"
 	"rssx/storage/redisx"
+	"rssx/user"
 	log "rssx/utils/logger"
 	"strconv"
 )
@@ -68,9 +69,9 @@ func (n *News) Save() {
 // read mark, redis set, value=news id
 const newsReadMark string = "read_mark:"
 
-func (n *News) IsRead(userId int) bool {
+func (n *News) IsRead(userId string) bool {
 	read := false
-	readMarkKey := newsReadMark + strconv.Itoa(userId) + ":" + strconv.Itoa(int(n.FeedId))
+	readMarkKey := newsReadMark + userId + ":" + strconv.Itoa(int(n.FeedId))
 	log.Debugf("check news is read, read flag key: %v, news id: %v", readMarkKey, n.Id)
 	r, _ := redisx.GetConn().Do("SISMEMBER", readMarkKey, n.Id)
 	if r != nil && r.(int64) == 1 {
@@ -94,7 +95,7 @@ func (n *News) LoadTitle() {
 	}
 }
 func (n *News) LoadReadFlag(userId int) {
-	n.ReadFlag = n.IsRead(0)
+	n.ReadFlag = n.IsRead(user.DefaultId)
 	log.Debugf("read mark, news id: %v, title: %v", n.Id, n.Title)
 }
 func (n *News) Load() {

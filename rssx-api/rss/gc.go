@@ -1,9 +1,10 @@
 package rss
 
 import (
-	"rssx/data"
 	"rssx/feed/news/list"
+	"rssx/feeds"
 	"rssx/storage/redisx"
+	"rssx/user"
 	"rssx/utils"
 	"rssx/utils/config"
 	log "rssx/utils/logger"
@@ -23,9 +24,9 @@ func Gc() {
 		oneMonthAgo := time.Now().Add(d)
 		oneMonthAgoMicroSecond := utils.TimeToMicroSecond(oneMonthAgo)
 
-		tmp := data.FindUserFeeds(0)
+		tmp := feeds.FindUserFeeds(user.DefaultId)
 
-		for _, v := range tmp {
+		for _, v := range *tmp {
 			feedId := int(v.Id)
 			feedNewsKey := list.FeedNewsKeyPrefix + strconv.Itoa(feedId)
 			expiredNews := redisx.GetNewsIdListByScore(feedNewsKey, 0, oneMonthAgoMicroSecond)

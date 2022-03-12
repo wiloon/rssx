@@ -11,8 +11,12 @@ import (
 	"time"
 )
 
-var sugaredLogger *zap.SugaredLogger
+var sugaredLogger Logger
+var dLogger Logger
 
+func init() {
+	dLogger = &defaultLogger{}
+}
 func Init(to, level, projectName string) {
 	var cores []zapcore.Core
 
@@ -23,26 +27,36 @@ func Init(to, level, projectName string) {
 		return
 	}
 
-	// file
-	fileEncoder := getEncoder()
-	writer := zapcore.AddSync(&lumberjack.Logger{
-		Filename:   fmt.Sprintf("/data/%s/logs/%s.log", projectName, level),
-		MaxSize:    200, // megabytes
-		MaxBackups: 3,
-		MaxAge:     30, // days
-	})
 	logTo := strings.ToUpper(to)
-	if logTo != "" || strings.Contains(logTo, "CONSOLE") {
+	logFilePath := "N/A"
+	if logTo == "" || strings.Contains(logTo, "CONSOLE") {
 		cores = append(cores, zapcore.NewCore(getEncoder(), zapcore.Lock(os.Stdout), lvl))
 	}
 	if logTo != "" && strings.Contains(logTo, "FILE") {
+		// file
+		fileEncoder := getEncoder()
+		logFilePath = fmt.Sprintf("/data/%s/logs/%s.log", projectName, level)
+		writer := zapcore.AddSync(&lumberjack.Logger{
+			Filename:   logFilePath,
+			MaxSize:    200, // megabytes
+			MaxBackups: 3,
+			MaxAge:     30, // days
+		})
 		cores = append(cores, zapcore.NewCore(fileEncoder, writer, lvl))
 	}
 	core := zapcore.NewTee(cores...)
 
 	sugaredLogger = zap.New(core).Sugar()
+	sugaredLogger.Infof("zap logger init, level: %s, to: %s, path: %s", level, to, logFilePath)
 }
 
+func GetLogger() Logger {
+	if sugaredLogger != nil {
+		return sugaredLogger
+	} else {
+		return dLogger
+	}
+}
 func getEncoder() zapcore.Encoder {
 	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
@@ -52,27 +66,40 @@ func getEncoder() zapcore.Encoder {
 	return zapcore.NewConsoleEncoder(encoderConfig)
 }
 
-func Infow(msg string, args ...interface{}) {
-	sugaredLogger.Infow(msg, args...)
-}
 func Debug(args ...interface{}) {
-	sugaredLogger.Debug(args...)
+	GetLogger().Debug(args...)
 }
 func Debugf(msg string, args ...interface{}) {
-	sugaredLogger.Debugf(msg, args...)
+	GetLogger().Debugf(msg, args...)
 }
 func Info(args ...interface{}) {
-	sugaredLogger.Info(args...)
+	GetLogger().Info(args...)
 }
 func Infof(msg string, args ...interface{}) {
-	sugaredLogger.Infof(msg, args...)
+	GetLogger().Infof(msg, args...)
 }
 func Error(args ...interface{}) {
-	sugaredLogger.Error(args...)
+	GetLogger().Error(args...)
 }
 func Errorf(msg string, args ...interface{}) {
-	sugaredLogger.Errorf(msg, args...)
+	GetLogger().Errorf(msg, args...)
 }
 func Warn(args ...interface{}) {
-	sugaredLogger.Warn(args...)
+	GetLogger().Warn(args...)
+}
+func Warnf(msg string, args ...interface{}) {
+	GetLogger().Errorf(msg, args...)
+}
+func Sync() {
+	GetLogger().Sync()
+}
+
+// Deprecated: Printf
+func Println(args ...interface{}) {
+	Info(args...)
+}
+
+// Deprecated: Printf
+func Printf(msg string, args ...interface{}) {
+	Infof(msg, args...)
 }

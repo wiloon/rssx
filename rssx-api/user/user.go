@@ -1,3 +1,3 @@
 package user
 
-const DefaultId = 0
+const DefaultId = "0"
