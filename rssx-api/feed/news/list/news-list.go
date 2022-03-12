@@ -32,7 +32,7 @@ func (newsList *NewsList) AppendNews(score int64, newsId string) {
 }
 
 // FindNewsListByUserFeed 按用户和feed取一页未读新闻
-func FindNewsListByUserFeed(userId, feedId int) []string {
+func FindNewsListByUserFeed(userId string, feedId int) []string {
 	var newsList []string
 
 	latestReadIndex := GetLatestReadIndex(userId, feedId)
@@ -120,10 +120,10 @@ const userFeedLatestReadIndex string = "read_index:"
 //因为删除旧数据之后 索引值会变，所以用户 已读标记， 用score做为已读标记
 //按score取index
 //redis里保存 score, 取最新的未读索引时时先取score再用score取member,再用member取位置   -_-!!
-func GetLatestReadIndex(userId, feedId int) int64 {
+func GetLatestReadIndex(userId string, feedId int) int64 {
 	log.Debugf("get latest read index, user id: %v, feed id: %v", userId, feedId)
 	score := 0
-	latestReadIndexKey := userFeedLatestReadIndex + strconv.Itoa(userId) + ":" + strconv.Itoa(feedId)
+	latestReadIndexKey := userFeedLatestReadIndex + userId + ":" + strconv.Itoa(feedId)
 	r, err := redisx.GetConn().Do("GET", latestReadIndexKey)
 	if err != nil {
 		log.Info(err.Error())

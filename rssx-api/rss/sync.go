@@ -23,17 +23,15 @@ func Sync() {
 	ticker := time.NewTicker(duration)
 	for ; true; <-ticker.C {
 		log.Info("new sync start")
-		//find all feeds
-		feedList := feeds.DefaultFeeds{}
-		syncFeeds(&feedList)
+		syncFeeds()
 		log.Info("sync tick done")
 	}
 }
 
-func syncFeeds(rssFeeds feeds.RssFeeds) {
+func syncFeeds() {
 	p, _ := ants.NewPoolWithFunc(2, syncOneFeed)
-	feedList := rssFeeds.GetAllFeedList()
-	for _, oneFeed := range feedList {
+	feedList := feeds.FindUserFeeds("0")
+	for _, oneFeed := range *feedList {
 		log.Debugf("invoke ant pool, feed id: %d", oneFeed.Id)
 		err := p.Invoke(oneFeed)
 		if err != nil {
@@ -45,19 +43,19 @@ func syncFeeds(rssFeeds feeds.RssFeeds) {
 }
 
 func syncOneFeed(data interface{}) {
-	oneFeed := data.(*feed.Feed)
+	oneFeed := data.(feed.Feed)
 	log.Infof("sync feed, id: %d, url: %s", oneFeed.Id, oneFeed.Url)
 	client := &http.Client{}
 	request, err := http.NewRequest("GET", oneFeed.Url, nil)
 	if err != nil {
-		log.Info("failed to sync feed:", oneFeed)
+		log.Errorf("failed to sync feed: %v, err: %v", oneFeed, err)
 		return
 	}
 	request.Header.Add("user-agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.30 Safari/537.36")
 	result, err := client.Do(request)
 
 	if err != nil {
-		log.Info("failed to sync feed:", oneFeed)
+		log.Errorf("failed to sync feed: %v, err: %v", oneFeed, err)
 		return
 	}
 
@@ -93,7 +91,7 @@ func syncOneFeed(data interface{}) {
 			guid = rssItem.Link
 		}
 
-		newsList := list.NewList(0, *oneFeed)
+		newsList := list.NewList(0, oneFeed)
 
 		// since duplicate pub date, and invalid pub date, set time.now() as score, make sure no duplicate score
 		score := utils.TimeNowMicrosecond()

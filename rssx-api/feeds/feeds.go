@@ -1,28 +1,42 @@
 package feeds
 
 import (
-	"rssx/data"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+	"log"
+	"os"
 	"rssx/feed"
+	zapLogger "rssx/utils/logger"
+	"time"
 )
 
-type RssFeeds interface {
-	GetAllFeedList() []*feed.Feed
-}
+var db *gorm.DB
 
-type DefaultFeeds struct {
+func init() {
+	newLogger := logger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
+		logger.Config{
+			SlowThreshold:             time.Second, // Slow SQL threshold
+			LogLevel:                  logger.Info, // Log level
+			IgnoreRecordNotFoundError: true,        // Ignore ErrRecordNotFound error for logger
+			Colorful:                  true,        // Disable color
+		},
+	)
+	var err error
+	db, err = gorm.Open(sqlite.Open("/data/rssx/rssx.db"), &gorm.Config{
+		Logger: newLogger,
+	})
+	checkErr(err)
 }
-
-// GetAllFeedList get all feeds
-func (f *DefaultFeeds) GetAllFeedList() []*feed.Feed {
-	stmt := "select feed_id,title,url from feed where deleted=?"
-	result := data.Rssx().Find(stmt, []interface{}{0}...)
-	var feeds []*feed.Feed
-	for _, v := range result {
-		feeds = append(feeds, &feed.Feed{
-			Id:    v["feed_id"].(int64),
-			Title: string(v["title"].([]uint8)),
-			Url:   string(v["url"].([]uint8)),
-		})
-	}
+func FindUserFeeds(userId string) *[]feed.Feed {
+	feeds := &[]feed.Feed{}
+	db.Table("user_feeds").Select("feeds.id,feeds.title,feeds.url").Joins("join feeds on user_feeds.feed_id = feeds.id").Where("user_id = ?", userId).Order("user_feeds.sort desc").Find(feeds)
 	return feeds
+}
+
+func checkErr(err error) {
+	if err != nil {
+		zapLogger.Errorf("err: %v", err)
+	}
 }

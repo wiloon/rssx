@@ -2,9 +2,9 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"rssx/data"
 	"rssx/feed"
 	"rssx/feed/news/list"
+	"rssx/feeds"
 	"rssx/news"
 	"rssx/rss"
 	"rssx/user"
@@ -195,19 +195,20 @@ func LoadNewsList(c *gin.Context) {
 
 func LoadFeedList(c *gin.Context) {
 	log.Debug("load user feed list")
-	feeds := []feed.Feed{{Id: -1, Title: "All", Url: ""}}
-	tmp := data.FindUserFeeds(user.DefaultId)
-
-	for _, v := range tmp {
+	feedsList := []feed.Feed{{Id: -1, Title: "All", Url: ""}}
+	tmp := feeds.FindUserFeeds(user.DefaultId)
+	log.Info("user feeds: %+v", tmp)
+	for _, v := range *tmp {
+		log.Debugf("feed: %+v", v)
 		count := list.Count(int(v.Id))
-		index := list.GetLatestReadIndex(0, int(v.Id))
+		index := list.GetLatestReadIndex(user.DefaultId, int(v.Id))
 		unread := count - index - 1
 		if unread < 0 {
 			unread = 0
 		}
 		v.Title = v.Title + " - " + strconv.Itoa(int(unread))
 		log.Debugf("feed list item: %v", v)
-		feeds = append(feeds, v)
+		feedsList = append(feedsList, v)
 	}
-	c.JSON(200, feeds)
+	c.JSON(200, feedsList)
 }
