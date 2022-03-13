@@ -4,6 +4,16 @@ import (
 	"time"
 )
 
+func SecondsToTime(seconds int64) time.Time {
+	return time.Unix(0, seconds*int64(time.Second))
+}
+
+func DateToSeconds(t time.Time) int64 {
+	return t.UnixNano() / int64(time.Second)
+}
+func CurrentSeconds() int64 {
+	return DateToSeconds(time.Now())
+}
 func TimeNowMicrosecond() int64 {
 	return TimeToMicroSecond(time.Now())
 }
@@ -33,4 +43,9 @@ func DateToStringYMDHM(timestamp time.Time) string {
 func StringToDateYMDHMS(str string) time.Time {
 	t, _ := time.Parse("2006-01-02 15:04:05", str)
 	return t
+}
+
+// CurrentDateString current date string: 2006-01-02 15:04:05
+func CurrentDateString() string {
+	return time.Now().Format("2006-01-02 15:04:05")
 }
