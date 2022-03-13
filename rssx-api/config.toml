@@ -1,5 +1,6 @@
 [rssx]
 rss-sync-auto=false
+security-key="fa6ee430-ebf6-44f2-a18b-64d691cd2dae"
 
 [mysql]
 address="mysql.wiloon.com:3306"

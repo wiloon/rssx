@@ -17,7 +17,7 @@ import (
 func main() {
 	log.Init("console,file", "debug", "rssx")
 
-	//定时同步新闻列表， rss源>redis
+	//定时同步文章列表， rss源>redis
 	syncAuto := config.GetBoolWithDefaultValue("rssx.rss-sync-auto", false)
 	log.Infof("sync auto: %b", syncAuto)
 	if syncAuto {
@@ -39,6 +39,8 @@ func main() {
 	router.GET("/news", LoadNews)
 	router.GET("/previous-news", PreviousNews)
 	router.GET("/mark-read", MarkWholePageAsRead)
+	router.POST("/login", user.Login)
+	router.POST("/register", user.Register)
 
 	err := router.Run(":8080")
 	handleErr(err)
@@ -92,7 +94,7 @@ func PreviousNews(c *gin.Context) {
 
 /*
 	LoadNews: load one news
-    按id加载一条新闻
+    按id加载一条文章
 */
 func LoadNews(c *gin.Context) {
 	feedId, _ := strconv.Atoi(c.Query("feedId"))
@@ -108,10 +110,10 @@ func LoadNews(c *gin.Context) {
 
 	log.Info("show news:", n.Title, ", next id:", n.NextId)
 
-	// 加载新的一条新闻时要维护已读未读的边界 和 不连续的已读记录
+	// 加载新的一条文章时要维护已读未读的边界 和 不连续的已读记录
 	// 用户当前已读索引
 	currentUserReadIndex := list.GetLatestReadIndex(user.DefaultId, feedId)
-	// 当前新闻的索引
+	// 当前文章的索引
 	currentNewsIndex := list.FindIndexById(feedId, newsId)
 	n.MarkRead(0)
 	log.Debugf("currentUserReadIndex: %v, currentNewsIndex: %v", currentUserReadIndex, currentNewsIndex)
@@ -122,7 +124,7 @@ func LoadNews(c *gin.Context) {
 		// 已读位置不连续，记录到已读集合
 		n.MarkRead(0)
 	} else {
-		//已读新闻是连续的，直接维护已读位置边界
+		//已读文章是连续的，直接维护已读位置边界
 		//更新用户已读索引
 		list.SetReadIndex(0, feedId, nextUnReadIndex)
 	}
@@ -147,7 +149,7 @@ func findNextUserUnReadIndex(feedId int, currentNewsIndex int64) int64 {
 		if nextNews.IsRead(user.DefaultId) {
 			result = findNextUserUnReadIndex(feedId, nextNewsIndex)
 		} else {
-			// 找到一条未读新闻，退出
+			// 找到一条未读文章，退出
 			result = currentNewsIndex
 		}
 	}
@@ -160,22 +162,22 @@ func checkIfAllPreviousNewsIsRead(feedId int, newsId string) bool {
 	result := false
 	// 用户当前已读索引
 	currentUserReadIndex := list.GetLatestReadIndex(user.DefaultId, feedId)
-	// 当前新闻的索引
+	// 当前文章的索引
 	currentNewsIndex := list.FindIndexById(feedId, newsId)
 	log.Debugf("checkIfAllPreviousNewsIsRead, currentUserReadIndex: %v, currentNewsIndex: %v", currentUserReadIndex, currentNewsIndex)
 	previousNewsIndex := currentNewsIndex - 1
 	if previousNewsIndex == currentUserReadIndex {
-		// 一直往前找，直到用户未读索引都是未读新闻，退出
+		// 一直往前找，直到用户未读索引都是未读文章，退出
 		result = true
 	} else {
-		// 检查上一条新闻是不是已读
+		// 检查上一条文章是不是已读
 		previousNewsId := list.FinOneNewsByIndex(previousNewsIndex, feedId)
 		previousNews := news.New(previousNewsId)
 		previousNews.FeedId = int64(feedId)
 		if previousNews.IsRead(user.DefaultId) {
 			result = checkIfAllPreviousNewsIsRead(feedId, previousNewsId)
 		} else {
-			// 找到一条未读新闻，退出
+			// 找到一条未读文章，退出
 			result = false
 		}
 	}

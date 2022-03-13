@@ -31,7 +31,7 @@ func (newsList *NewsList) AppendNews(score int64, newsId string) {
 	_, _ = redisx.GetConn().Do("ZADD", feedNewsKey, score, newsId)
 }
 
-// FindNewsListByUserFeed 按用户和feed取一页未读新闻
+// FindNewsListByUserFeed 按用户和feed取一页未读文章
 func FindNewsListByUserFeed(userId string, feedId int) []string {
 	var newsList []string
 
@@ -48,7 +48,7 @@ func NewsListKey(feedId int) string {
 	return FeedNewsKeyPrefix + strconv.Itoa(feedId)
 }
 
-// FindNewsListByRange 按索引取新闻列表
+// FindNewsListByRange 按索引取文章列表
 func FindNewsListByRange(key string, start, end int64) []string {
 	log.Debugf("find news list by rang, start: %v, end: %v", start, end)
 	var newsidList []string
@@ -67,7 +67,7 @@ func FindNewsListByRange(key string, start, end int64) []string {
 	return newsidList
 }
 
-// FinOneNewsByIndex 按索引取某一条新闻的id
+// FinOneNewsByIndex 按索引取某一条文章的id
 func FinOneNewsByIndex(index int64, feedId int) string {
 	newsIdList := FindNewsListByRange(NewsListKey(feedId), index, index)
 	if newsIdList != nil && len(newsIdList) > 0 {
