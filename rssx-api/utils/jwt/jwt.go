@@ -3,8 +3,9 @@ package jwt
 import (
 	"encoding/base64"
 	"errors"
-	"github.com/dgrijalva/jwt-go"
+	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt"
 	"github.com/patrickmn/go-cache"
 	"github.com/satori/go.uuid"
 	"rssx/utils"
@@ -21,23 +22,30 @@ func init() {
 	tokenRefreshCache = cache.New(1*time.Minute, 10*time.Minute)
 }
 
+type RssxClaims struct {
+	Id string `json:"id"`
+	jwt.StandardClaims
+}
+
 func NewToken(id string) string {
-	// jwt
-	jwtPayload := Payload{
-		Iss: "wiloon.com",
-		Sub: "rssx",
-		Aud: "rssx.wiloon.net",
-		Nbf: utils.CurrentSeconds(),
-		Exp: utils.DateToSeconds(time.Now().AddDate(0, 0, 1)),
-		Iat: utils.CurrentSeconds(),
-		Jti: uuid.NewV4().String(),
-		Id:  id,
+	// Create the Claims
+	claims := RssxClaims{
+		id,
+		jwt.StandardClaims{
+			Audience:  "rssx.wiloon.net",
+			ExpiresAt: utils.DateToSeconds(time.Now().AddDate(0, 0, 1)),
+			Id:        uuid.NewV4().String(),
+			IssuedAt:  utils.CurrentSeconds(),
+			Issuer:    "wiloon.com",
+			NotBefore: utils.CurrentSeconds(),
+			Subject:   "rssx",
+		},
 	}
-	jwtTokenString, err := GetJwtToken(jwtPayload)
-	if err != nil {
-		logger.Error("failed to sign jwt", err)
-	}
-	return jwtTokenString
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedString, err := token.SignedString(config.GetString("security-key", ""))
+	fmt.Printf("%v %v", signedString, err)
+
+	return signedString
 }
 
 func GetJwtToken(jwtPayload Payload) (token string, err error) {
@@ -74,15 +82,23 @@ type Payload struct {
 
 // ParseToken signature is invalid
 // Token is expired
-func ParseToken(tokenStr string) (jwtPayload *Payload, err error) {
-	jwtPayload = &Payload{}
-	token, err := jwt.Parse(tokenStr, secret())
-	if err != nil {
-		logger.Warnf("invalid token: %s, err: %v", tokenStr, err)
-		err = errors.New("invalid token")
-		return
-	}
-	claim, ok := token.Claims.(jwt.MapClaims)
+func ParseToken(tokenString string) (jwtPayload *Payload, err error) {
+	// Parse takes the token string and a function for looking up the key. The latter is especially
+	// useful if you use multiple keys for your application.  The standard is to use 'kid' in the
+	// head of the token to identify which key to use, but the parsed token (head and claims) is provided
+	// to the callback, providing flexibility.
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Don't forget to validate the alg is what you expect:
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+
+		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
+		return config.GetString("security-key", ""), nil
+	})
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+
 	if !ok {
 		err = errors.New("cannot convert claim to mapclaim")
 		return
@@ -92,29 +108,29 @@ func ParseToken(tokenStr string) (jwtPayload *Payload, err error) {
 		err = errors.New("token is invalid")
 		return
 	}
-	if claim["iss"] != nil {
-		jwtPayload.Iss = claim["iss"].(string)
+	if claims["iss"] != nil {
+		jwtPayload.Iss = claims["iss"].(string)
 	}
-	if claim["sub"] != nil {
-		jwtPayload.Sub = claim["sub"].(string)
+	if claims["sub"] != nil {
+		jwtPayload.Sub = claims["sub"].(string)
 	}
-	if claim["aud"] != nil {
-		jwtPayload.Sub = claim["aud"].(string)
+	if claims["aud"] != nil {
+		jwtPayload.Sub = claims["aud"].(string)
 	}
-	if claim["nbf"] != nil {
-		jwtPayload.Nbf = int64(claim["nbf"].(float64))
+	if claims["nbf"] != nil {
+		jwtPayload.Nbf = int64(claims["nbf"].(float64))
 	}
-	if claim["exp"] != nil {
-		jwtPayload.Exp = int64(claim["exp"].(float64))
+	if claims["exp"] != nil {
+		jwtPayload.Exp = int64(claims["exp"].(float64))
 	}
-	if claim["iat"] != nil {
-		jwtPayload.Iat = int64(claim["iat"].(float64))
+	if claims["iat"] != nil {
+		jwtPayload.Iat = int64(claims["iat"].(float64))
 	}
-	if claim["jti"] != nil {
-		jwtPayload.Jti = claim["jti"].(string)
+	if claims["jti"] != nil {
+		jwtPayload.Jti = claims["jti"].(string)
 	}
-	if claim["id"] != nil {
-		jwtPayload.Id = claim["id"].(string)
+	if claims["id"] != nil {
+		jwtPayload.Id = claims["id"].(string)
 	}
 	return jwtPayload, err
 }
