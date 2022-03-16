@@ -23,7 +23,7 @@ func init() {
 		},
 	)
 	var err error
-	DB, err = gorm.Open(sqlite.Open("/data/rssx/rssx.db"), &gorm.Config{
+	DB, err = gorm.Open(sqlite.Open("/var/lib/rssx-api/rssx-api.db"), &gorm.Config{
 		Logger: newLogger,
 	})
 	if err != nil {

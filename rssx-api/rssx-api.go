@@ -15,11 +15,11 @@ import (
 )
 
 func main() {
-	log.Init("console,file", "debug", "rssx")
+	log.Init("console,file", "debug", "rssx-api")
 
 	//定时同步文章列表， rss源>redis
 	syncAuto := config.GetBoolWithDefaultValue("rssx.rss-sync-auto", false)
-	log.Infof("sync auto: %b", syncAuto)
+	log.Infof("sync auto: %t", syncAuto)
 	if syncAuto {
 		go rss.Sync()
 	}

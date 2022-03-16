@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const sysEnvKeyAppConfig = "app_config"
+const sysEnvKeyAppConfig = "APP_CONFIG_PATH"
 const KeyProjectName = "project.name"
 
 var defaultFileName = "config.toml"
@@ -47,18 +47,23 @@ func LoadConfigByPath(fullPath string) {
 }
 
 func configPath() string {
-	configPath := os.Getenv(sysEnvKeyAppConfig)
-	if strings.EqualFold(configPath, "") || !isFileExist(getConfigFilePath(configPath)) {
-		log.Printf("system env key not found, key: %v", sysEnvKeyAppConfig)
-
-		configPath = execPath()
-		if strings.EqualFold(configPath, "") || !isFileExist(getConfigFilePath(configPath)) {
-			configPath = currentPath()
-		}
+	path := os.Getenv(sysEnvKeyAppConfig)
+	if path != "" && isFileExist(getConfigFilePath(path)) {
+		return configFileFullPath(path)
 	}
-	configPath = filepath.Join(configPath, defaultFileName)
-	log.Println("config file path:", configPath)
-	return configPath
+	path = execPath()
+	if path != "" && isFileExist(getConfigFilePath(path)) {
+		return configFileFullPath(path)
+	}
+
+	path = currentPath()
+
+	fullPath := filepath.Join(path, defaultFileName)
+	log.Println("config file path:", fullPath)
+	return fullPath
+}
+func configFileFullPath(path string) string {
+	return filepath.Join(path, defaultFileName)
 }
 
 func getConfigFilePath(configPath string) string {
