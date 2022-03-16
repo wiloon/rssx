@@ -35,7 +35,7 @@ func Init(to, level, projectName string) {
 	if logTo != "" && strings.Contains(logTo, "FILE") {
 		// file
 		fileEncoder := getEncoder()
-		logFilePath = fmt.Sprintf("/data/%s/logs/%s.log", projectName, level)
+		logFilePath = fmt.Sprintf("/var/log/%s/%s.log", projectName, level)
 		writer := zapcore.AddSync(&lumberjack.Logger{
 			Filename:   logFilePath,
 			MaxSize:    200, // megabytes
