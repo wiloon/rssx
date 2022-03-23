@@ -32,7 +32,7 @@ func LoadLocalConfig(configFileName string) {
 func LoadConfigByPath(fullPath string) {
 	log.Printf("load config by path: %s\n", fullPath)
 	if !isFileExist(fullPath) {
-		log.Println("conifg file not found:", fullPath)
+		log.Println("config file not found:", fullPath)
 		return
 	}
 
@@ -41,7 +41,7 @@ func LoadConfigByPath(fullPath string) {
 		fmt.Print(err)
 	}
 	str := string(b)
-	log.Printf("config file content: %v", str)
+	log.Printf("config file content: \n%v", str)
 
 	conf, _ = toml.Load(str)
 }

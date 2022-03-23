@@ -2,7 +2,6 @@ package rss
 
 import (
 	"encoding/xml"
-	"fmt"
 	"github.com/panjf2000/ants/v2"
 	"io"
 	"io/ioutil"
@@ -69,14 +68,14 @@ func syncOneFeed(data interface{}) {
 	var remoteFeedBody []byte
 	if result.StatusCode == http.StatusOK {
 		remoteFeedBody, _ = ioutil.ReadAll(result.Body)
-		bodyString := string(remoteFeedBody) //todo if debug enabled convert to string
-		log.Debug("get feed OK, feed body:", bodyString)
+		//bodyString := string(remoteFeedBody) //todo if debug enabled convert to string
+		// log.Debug("get feed OK, feed body:", bodyString)
 	}
 
 	rss := Rss{}
 	err = xml.Unmarshal(remoteFeedBody, &rss)
 	if err != nil {
-		fmt.Printf("error: %v", err)
+		log.Error("failed to unmarshal: %v", err)
 		return
 	}
 

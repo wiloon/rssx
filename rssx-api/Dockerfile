@@ -2,9 +2,9 @@ FROM archlinux:base-20220306.0.49442 AS prod
 
 MAINTAINER wiloon <wiloon.wy@gmail.com>
 
+ARG APP_NAME=rssx-api
 # config file
 ENV APP_CONFIG_PATH /etc/${APP_NAME}
-ARG APP_NAME=rssx-api
 # bin
 COPY ${APP_NAME} /usr/local/bin
 COPY config.toml config.toml
