@@ -40,13 +40,9 @@ func main() {
 	router.POST("/register", user.Register)
 
 	err := router.Run(":8080")
-	handleErr(err)
+	if err != nil {
+		log.Errorf("failed to start rssx: %v", err)
+	}
 	log.Info("rssx started and listening default port of gin")
 	utils.WaitSignals()
-}
-
-func handleErr(e error) {
-	if e != nil {
-		log.Info(e.Error())
-	}
 }
