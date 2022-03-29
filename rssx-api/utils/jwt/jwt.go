@@ -42,8 +42,10 @@ func NewToken(id string) string {
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedString, err := token.SignedString(config.GetString("security-key", ""))
-	fmt.Printf("%v %v", signedString, err)
+	signedString, err := token.SignedString([]byte(config.GetString("rssx.security-key", "")))
+	if err != nil {
+		logger.Infof("failed to gen jwt token: %v", err)
+	}
 
 	return signedString
 }

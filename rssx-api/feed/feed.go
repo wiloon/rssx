@@ -1,5 +1,6 @@
 package feed
 
+// Feed one rss feed
 type Feed struct {
 	Id    int64
 	Title string

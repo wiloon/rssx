@@ -5,7 +5,6 @@ import (
 	"rssx/feed"
 	"rssx/feed/news/list"
 	"rssx/feeds"
-	"rssx/news"
 	"rssx/rss"
 	"rssx/user"
 	"rssx/utils"
@@ -35,10 +34,10 @@ func main() {
 	})
 
 	router.GET("/feeds", LoadFeedList)
-	router.GET("/news-list", LoadNewsList)
-	router.GET("/news", LoadNews)
-	router.GET("/previous-news", PreviousNews)
-	router.GET("/mark-read", MarkWholePageAsRead)
+	router.GET("/news-list", list.LoadNewsList)
+	router.GET("/news", list.LoadArticles)
+	router.GET("/previous-news", list.PreviousArticle)
+	router.GET("/mark-read", list.MarkWholePageAsRead)
 	router.POST("/login", user.Login)
 	router.POST("/register", user.Register)
 
@@ -52,147 +51,6 @@ func handleErr(e error) {
 	if e != nil {
 		log.Info(e.Error())
 	}
-}
-
-func MarkWholePageAsRead(c *gin.Context) {
-
-	feedId, _ := strconv.Atoi(c.Query("feedId"))
-	readIndex := list.GetLatestReadIndex(user.DefaultId, feedId)
-	// reset read index
-	newIndex := readIndex + list.PageSize //新已读=旧值加每页数量
-	count := list.Count(feedId)
-	if newIndex >= count {
-		newIndex = count - 1
-	}
-	log.Infof("mark page as read, feed id: %v,  last read index: %v, new index: %v, list count: %v",
-		feedId, readIndex, newIndex, count)
-
-	list.SetReadIndex(0, feedId, newIndex) //save
-	// del read mark set,按feed删除
-	news.DelReadMark(0, feedId)
-
-	// load next page
-	newsList := list.LoadNewsListByFeed(feedId)
-	c.JSON(200, newsList)
-}
-
-func PreviousNews(c *gin.Context) {
-	currentNewsId := c.Query("newsId")
-	feedId, _ := strconv.Atoi(c.Query("feedId"))
-	log.Debugf(" load previous news feed id:%v, news id:%v", feedId, currentNewsId)
-	index := list.FindIndexById(feedId, currentNewsId)
-	newsIds := list.FindNewsListByRange(list.NewsListKey(feedId), index-1, index-1)
-	previousNewsId := newsIds[0]
-	previousNews := news.New(previousNewsId)
-	previousNews.FeedId = int64(feedId)
-	previousNews.Load()
-	nextNewsId := list.FindNextId(feedId, previousNewsId)
-	previousNews.NextId = nextNewsId
-	c.JSON(200, previousNews)
-
-}
-
-/*
-	LoadNews: load one news
-    按id加载一条文章
-*/
-func LoadNews(c *gin.Context) {
-	feedId, _ := strconv.Atoi(c.Query("feedId"))
-	newsId := c.Query("id")
-
-	n := news.New(newsId)
-	n.FeedId = int64(feedId)
-	n.Load()
-	log.Debugf("load one news, feed id:%v, news id:%v, title: %s", feedId, newsId, n.Title)
-
-	nextNewsId := list.FindNextId(feedId, newsId)
-	n.NextId = nextNewsId
-
-	log.Info("show news:", n.Title, ", next id:", n.NextId)
-
-	// 加载新的一条文章时要维护已读未读的边界 和 不连续的已读记录
-	// 用户当前已读索引
-	currentUserReadIndex := list.GetLatestReadIndex(user.DefaultId, feedId)
-	// 当前文章的索引
-	currentNewsIndex := list.FindIndexById(feedId, newsId)
-	n.MarkRead(0)
-	log.Debugf("currentUserReadIndex: %v, currentNewsIndex: %v", currentUserReadIndex, currentNewsIndex)
-
-	nextUnReadIndex := findNextUserUnReadIndex(feedId, currentUserReadIndex)
-	log.Debugf("currentUserReadIndex: %v, nextUnReadIndex: %v", currentUserReadIndex, nextUnReadIndex)
-	if currentUserReadIndex == nextUnReadIndex {
-		// 已读位置不连续，记录到已读集合
-		n.MarkRead(0)
-	} else {
-		//已读文章是连续的，直接维护已读位置边界
-		//更新用户已读索引
-		list.SetReadIndex(0, feedId, nextUnReadIndex)
-	}
-	c.JSON(200, n)
-
-}
-
-/**
-找到用户下一个未读索引
-*/
-func findNextUserUnReadIndex(feedId int, currentNewsIndex int64) int64 {
-	log.Debugf("findNextUserUnReadIndex, feed id: %v, index: %v", feedId, currentNewsIndex)
-	var result int64
-	nextNewsIndex := currentNewsIndex + 1
-	nextNewsId := list.FinOneNewsByIndex(nextNewsIndex, feedId)
-
-	if nextNewsId == "" {
-		result = currentNewsIndex
-	} else {
-		nextNews := news.New(nextNewsId)
-		nextNews.FeedId = int64(feedId)
-		if nextNews.IsRead(user.DefaultId) {
-			result = findNextUserUnReadIndex(feedId, nextNewsIndex)
-		} else {
-			// 找到一条未读文章，退出
-			result = currentNewsIndex
-		}
-	}
-
-	log.Debugf("findNextUserUnReadIndex, feed id: %v, index: %v, result: %v", feedId, currentNewsIndex, result)
-	return result
-}
-
-func checkIfAllPreviousNewsIsRead(feedId int, newsId string) bool {
-	result := false
-	// 用户当前已读索引
-	currentUserReadIndex := list.GetLatestReadIndex(user.DefaultId, feedId)
-	// 当前文章的索引
-	currentNewsIndex := list.FindIndexById(feedId, newsId)
-	log.Debugf("checkIfAllPreviousNewsIsRead, currentUserReadIndex: %v, currentNewsIndex: %v", currentUserReadIndex, currentNewsIndex)
-	previousNewsIndex := currentNewsIndex - 1
-	if previousNewsIndex == currentUserReadIndex {
-		// 一直往前找，直到用户未读索引都是未读文章，退出
-		result = true
-	} else {
-		// 检查上一条文章是不是已读
-		previousNewsId := list.FinOneNewsByIndex(previousNewsIndex, feedId)
-		previousNews := news.New(previousNewsId)
-		previousNews.FeedId = int64(feedId)
-		if previousNews.IsRead(user.DefaultId) {
-			result = checkIfAllPreviousNewsIsRead(feedId, previousNewsId)
-		} else {
-			// 找到一条未读文章，退出
-			result = false
-		}
-	}
-	log.Debugf("checkIfAllPreviousNewsIsRead, currentUserReadIndex: %v, currentNewsIndex: %v, result: %v", currentUserReadIndex, currentNewsIndex, result)
-	return result
-}
-func LoadNewsList(c *gin.Context) {
-	feedIdStr := c.Query("id")
-	feedId, _ := strconv.Atoi(feedIdStr)
-	log.Debugf("load news list by feed id: %v", feedId)
-
-	newsList := list.LoadNewsListByFeed(feedId)
-
-	c.JSON(200, newsList)
-
 }
 
 func LoadFeedList(c *gin.Context) {
