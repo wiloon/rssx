@@ -1,6 +1,6 @@
 # rssx
 
-一个RSS阅读器
+A RSS Reader
 
 ## redis key
 ### 某一个feed的 所有 news id，按时间排序的
