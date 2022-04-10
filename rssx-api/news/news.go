@@ -12,15 +12,11 @@ func init() {
 
 }
 
-var bucket = "NewsBucket"
-
 const (
-	NewsId      = "Id"
 	FeedId      = "FeedId"
 	Title       = "Title"
 	Url         = "Url"
 	Description = "Description"
-	NextNewsId  = "NextId"
 	PubDate     = "PubDate"
 	Guid        = "Guid"
 	Score       = "Score"
@@ -54,7 +50,7 @@ func (site *Site) Append(title, url, description string) {
 }
 
 func (n *News) Save() {
-	_, _ = redisx.GetConn().Do("HMSET", "news:"+n.Id,
+	_, _ = redisx.Exec("HMSET", "news:"+n.Id,
 		FeedId, n.FeedId,
 		Title, n.Title,
 		Url, n.Url,
@@ -73,7 +69,7 @@ func (n *News) IsRead(userId string) bool {
 	read := false
 	readMarkKey := newsReadMark + userId + ":" + strconv.Itoa(int(n.FeedId))
 	log.Debugf("check news is read, read flag key: %v, news id: %v", readMarkKey, n.Id)
-	r, _ := redisx.GetConn().Do("SISMEMBER", readMarkKey, n.Id)
+	r, _ := redisx.Exec("SISMEMBER", readMarkKey, n.Id)
 	if r != nil && r.(int64) == 1 {
 		read = true
 	}
@@ -82,24 +78,24 @@ func (n *News) IsRead(userId string) bool {
 }
 
 func (n *News) MarkRead(userId int) {
-	_, _ = redisx.GetConn().Do("SADD", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(n.FeedId)), n.Id)
+	_, _ = redisx.Exec("SADD", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(n.FeedId)), n.Id)
 	log.Debugf("mark news as read, news id: %v", n.Id)
 }
 
 const newsKeyPrefix string = "news:"
 
 func (n *News) LoadTitle() {
-	result, _ := redis.Values(redisx.GetConn().Do("HMGET", newsKeyPrefix+n.Id, Title))
+	result, _ := redis.Values(redisx.Exec("HMGET", newsKeyPrefix+n.Id, Title))
 	if result != nil && len(result) > 0 {
 		n.Title = string(result[0].([]byte))
 	}
 }
-func (n *News) LoadReadFlag(userId int) {
+func (n *News) LoadReadFlag() {
 	n.ReadFlag = n.IsRead(user.DefaultId)
 	log.Debugf("read mark, news id: %v, title: %v", n.Id, n.Title)
 }
 func (n *News) Load() {
-	result, err := redis.Values(redisx.GetConn().Do("HMGET", newsKeyPrefix+n.Id, Title, Url, Description, Score, PubDate))
+	result, err := redis.Values(redisx.Exec("HMGET", newsKeyPrefix+n.Id, Title, Url, Description, Score, PubDate))
 	if err != nil {
 		log.Info(err.Error())
 	}
@@ -114,5 +110,5 @@ func (n *News) Load() {
 }
 
 func DelReadMark(userId, feedId int) {
-	_, _ = redisx.GetConn().Do("DEL", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(feedId)))
+	_, _ = redisx.Exec("DEL", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(feedId)))
 }
