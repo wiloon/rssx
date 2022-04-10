@@ -11,7 +11,6 @@ import (
 )
 
 const sysEnvKeyAppConfig = "APP_CONFIG_PATH"
-const KeyProjectName = "project.name"
 
 var defaultFileName = "config.toml"
 
@@ -97,7 +96,7 @@ func GetString(key string, def string) string {
 		}
 	}
 
-	log.Printf("key: %s, value: %s", key, value)
+	// log.Printf("key: %s, value: %s", key, value)
 
 	return value
 }
