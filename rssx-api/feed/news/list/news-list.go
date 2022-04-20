@@ -206,7 +206,7 @@ func LoadNewsListByFeed(feedId int) []news.News {
 			n := news.New(v)
 			n.FeedId = int64(feedId)
 			n.LoadTitle()
-			n.LoadReadFlag(0)
+			n.LoadReadFlag()
 			// calculate unread count
 
 			newsList = append(newsList, *n)
