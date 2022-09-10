@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@mdi/font": "^3.6.95",
-    "axios": "^0.20.0",
+    "axios": "^0.26.1",
     "core-js": "^3.6.5",
     "lodash": "4.17.21",
     "register-service-worker": "^1.7.1",
