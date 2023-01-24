@@ -9,5 +9,6 @@ ENV APP_CONFIG_PATH /etc/${APP_NAME}
 COPY ${APP_NAME} /usr/local/bin
 COPY config.toml config.toml
 COPY config.toml /data/${APP_NAME}/config.toml
+COPY rssx-api.db /var/lib/${APP_NAME}/rssx-api.db
 ENV APPLICATION_NAME ${APP_NAME}
 CMD "/usr/local/bin/${APPLICATION_NAME}"
