@@ -1,4 +1,4 @@
-FROM archlinux:base-20230108.0.116909 AS prod
+FROM alpine:3.17.1 AS prod
 
 MAINTAINER wiloon <wiloon.wy@gmail.com>
 
