@@ -1,4 +1,4 @@
-FROM archlinux:base-20220306.0.49442 AS prod
+FROM archlinux:base-20230108.0.116909 AS prod
 
 MAINTAINER wiloon <wiloon.wy@gmail.com>
 
