@@ -13,18 +13,18 @@ md5sum ~/projects/rssx/rssx-api/rssx-api
 # Set the required variables
 export REGISTRY="registry.wiloon.com"
 
+export manifest_name=${project_name}-manifest
 sudo podman image ls
-sudo podman manifest rm registry.wiloon.com/rssx-api:${version}
+sudo podman manifest rm ${manifest_name}:${version}
 sudo podman image ls
 
-# Create a multi-architecture manifest
-export manifest_name=${project_name}-manifest
+
 sudo buildah manifest create ${manifest_name}:${version}
 
 sudo buildah bud --arch=amd64 -t registry.wiloon.com/rssx-api:${version} --manifest ${manifest_name} .
 rm ~/projects/rssx/rssx-api/rssx-api
 
-CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc CC_FOR_TARGET=gcc-aarch64-linux-gnu GOPROXY=https://athens.wiloon.com go build -v -a -o ${project_name} ${project_name}.go
+CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc CC_FOR_TARGET=gcc-aarch64-linux-gnu GOPROXY=https://athens.wiloon.com go build -v -o ${project_name} ${project_name}.go
 ls -l ~/projects/rssx/rssx-api/rssx-api
 md5sum ~/projects/rssx/rssx-api/rssx-api
 
