@@ -30,6 +30,7 @@ func Sync() {
 func syncFeeds() {
 	p, _ := ants.NewPoolWithFunc(2, syncOneFeed)
 	feedList := feeds.FindUserFeeds("0")
+	log.Debugf("user feed list: %v", len(*feedList))
 	for _, oneFeed := range *feedList {
 		log.Debugf("invoke ant pool, feed id: %d", oneFeed.Id)
 		err := p.Invoke(oneFeed)

@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	log.Init("file", "debug", "rssx-api")
+	log.Init("console", "debug", "rssx-api")
 
 	//定时同步文章列表， rss源>redis
 	syncAuto := config.GetBoolWithDefaultValue("rssx.rss-sync-auto", false)
