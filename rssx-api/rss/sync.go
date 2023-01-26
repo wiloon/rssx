@@ -1,6 +1,7 @@
 package rss
 
 import (
+	"crypto/tls"
 	"encoding/xml"
 	"github.com/panjf2000/ants/v2"
 	"io"
@@ -45,6 +46,8 @@ func syncFeeds() {
 func syncOneFeed(data interface{}) {
 	oneFeed := data.(feed.Feed)
 	log.Infof("sync feed, id: %d, url: %s", oneFeed.Id, oneFeed.Url)
+	// insecure https
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	client := &http.Client{}
 	request, err := http.NewRequest("GET", oneFeed.Url, nil)
 	if err != nil {

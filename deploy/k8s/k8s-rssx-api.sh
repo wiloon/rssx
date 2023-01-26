@@ -16,6 +16,7 @@ export REGISTRY="registry.wiloon.com"
 export manifest_name=${project_name}-manifest
 sudo podman image ls
 sudo podman manifest rm ${manifest_name}:${version}
+sudo podman manifest rm ${manifest_name}:latest
 sudo podman image ls
 
 
@@ -32,6 +33,8 @@ sudo podman image ls
 
 sudo buildah bud --arch=arm64 -t registry.wiloon.com/rssx-api:${version} --manifest ${manifest_name} .
 rm ~/projects/rssx/rssx-api/rssx-api
+
+echo "push manifest"
 
 sudo buildah manifest push --all \
     ${manifest_name} \
