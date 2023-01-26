@@ -1,7 +1,3 @@
 #!/bin/sh
-
-for i in {1..1000}
-do
-        date
-        sleep 10s
-done
+echo "socat starting..."
+socat TCP-LISTEN:3389,fork TCP:192.168.55.2:3389

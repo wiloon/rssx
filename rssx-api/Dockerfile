@@ -1,4 +1,4 @@
-FROM alpine:3.17.1 AS prod
+FROM ubuntu:22.04 AS prod
 
 MAINTAINER wiloon <wiloon.wy@gmail.com>
 
@@ -13,6 +13,12 @@ COPY rssx-api.db /var/lib/${APP_NAME}/rssx-api.db
 
 COPY test.sh /usr/local/bin
 
-ENV APPLICATION_NAME ${APP_NAME}
-#CMD "/usr/local/bin/${APPLICATION_NAME}"
+# ENV APPLICATION_NAME ${APP_NAME}
+# CMD "/usr/local/bin/${APPLICATION_NAME}"
+
+RUN apt-get update -y
+RUN apt-get install -y socat
+RUN chmod u+x /usr/local/bin/test.sh
+RUN ["chmod", "u+x", "/usr/local/bin/test.sh"]
+RUN ["ls","-l","/usr/local/bin/test.sh"]
 CMD "/usr/local/bin/test.sh"

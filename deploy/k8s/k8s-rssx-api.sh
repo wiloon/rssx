@@ -8,17 +8,21 @@ cd ~/projects/rssx/rssx-api || exit
 # go-sqlite3 requires cgo
 CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GOPROXY=https://goproxy.io go build -v -a -o ${projectName} ${projectName}.go
 ls -l ~/projects/rssx/rssx-api/rssx-api
+md5sum ~/projects/rssx/rssx-api/rssx-api
 sudo buildah bud --arch=amd64 -t registry.wiloon.com/rssx-api:${version}-amd64 .
 sudo buildah push registry.wiloon.com/rssx-api:${version}-amd64
 rm ~/projects/rssx/rssx-api/rssx-api
 
 CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc CC_FOR_TARGET=gcc-aarch64-linux-gnu GOPROXY=https://goproxy.io go build -v -a -o ${projectName} ${projectName}.go
 ls -l ~/projects/rssx/rssx-api/rssx-api
+md5sum ~/projects/rssx/rssx-api/rssx-api
 sudo buildah bud --arch=arm64 -t registry.wiloon.com/rssx-api:${version}-arm64 .
 sudo buildah push registry.wiloon.com/rssx-api:${version}-arm64
 rm ~/projects/rssx/rssx-api/rssx-api
 
-podman image rm registry.wiloon.com/rssx-api:v0.0.1
+podman image ls
+podman manifest rm registry.wiloon.com/rssx-api:${version}
+podman image ls
 
 buildah manifest create registry.wiloon.com/rssx-api:${version} \
     --amend registry.wiloon.com/rssx-api:${version}-amd64 \
