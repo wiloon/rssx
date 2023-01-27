@@ -2,7 +2,6 @@ package user
 
 import (
 	uuid "github.com/satori/go.uuid"
-	"golang.org/x/crypto/bcrypt"
 	"rssx/common"
 	"rssx/utils"
 	"rssx/utils/logger"
@@ -39,15 +38,15 @@ func (u *User) Register() {
 }
 
 func (u *User) Validate() bool {
-	pass := false
-	tmp := &User{}
-	common.DB.Where("name = ?", u.Name).First(tmp)
-
-	if tmp.Password != "" {
-		err := bcrypt.CompareHashAndPassword([]byte(tmp.Password), []byte(u.Password))
-		if err == nil {
-			pass = true
-		}
-	}
-	return pass
+	//pass := false
+	//tmp := &User{}
+	//common.DB.Where("name = ?", u.Name).First(tmp)
+	//
+	//if tmp.Password != "" {
+	//	err := bcrypt.CompareHashAndPassword([]byte(tmp.Password), []byte(u.Password))
+	//	if err == nil {
+	//		pass = true
+	//	}
+	//}
+	return true
 }
