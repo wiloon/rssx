@@ -5,7 +5,6 @@ import (
 	"encoding/xml"
 	"github.com/panjf2000/ants/v2"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"rssx/feed"
 	"rssx/feed/news/list"
@@ -71,9 +70,7 @@ func syncOneFeed(data interface{}) {
 
 	var remoteFeedBody []byte
 	if result.StatusCode == http.StatusOK {
-		remoteFeedBody, _ = ioutil.ReadAll(result.Body)
-		//bodyString := string(remoteFeedBody) //todo if debug enabled convert to string
-		// log.Debug("get feed OK, feed body:", bodyString)
+		remoteFeedBody, _ = io.ReadAll(result.Body)
 	}
 
 	rss := Rss{}
@@ -88,7 +85,7 @@ func syncOneFeed(data interface{}) {
 		url := rssItem.Link
 		guid := rssItem.Guid
 
-		log.Debugf("index:%v, title:%v, guid:%v", i, string(rssItem.Title), guid)
+		log.Debugf("index:%v, title:%v, guid: %v", i, rssItem.Title, guid)
 
 		if strings.EqualFold(guid, "") {
 			guid = rssItem.Link
