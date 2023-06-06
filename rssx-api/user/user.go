@@ -6,6 +6,7 @@ import (
 	"rssx/common"
 	"rssx/utils"
 	"rssx/utils/logger"
+	log "rssx/utils/logger"
 )
 
 const DefaultId = "0"
@@ -42,6 +43,7 @@ func (u *User) Validate() bool {
 	pass := false
 	tmp := &User{}
 	common.DB.Where("name = ?", u.Name).First(tmp)
+	log.Debugf("user from db, params: %+v", tmp)
 
 	if tmp.Password != "" {
 		err := bcrypt.CompareHashAndPassword([]byte(tmp.Password), []byte(u.Password))

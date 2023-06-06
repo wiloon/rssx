@@ -1,0 +1,38 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rssx-ui
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: rssx-ui
+  template:
+    metadata:
+      labels:
+        name: rssx-ui
+    spec:
+      containers:
+        - name: rssx-ui-container
+          image: registry.wiloon.com/rssx-ui:v0.0.1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rssx-ui-service
+  namespace: default
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 18082
+      targetPort: 80
+      nodePort: 31082
+  selector:
+    name: rssx-ui

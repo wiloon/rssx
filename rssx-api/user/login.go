@@ -19,7 +19,7 @@ func Login(c *gin.Context) {
 		response.ShowError(c, "用户名或密码格式错误")
 		return
 	}
-	log.Debugf("user login, params: %v", u)
+	log.Debugf("user login, params: %+v", u)
 	if u.Name == "" || u.Password == "" {
 		response.ShowError(c, "用户名或密码为空")
 		return

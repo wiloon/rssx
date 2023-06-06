@@ -5,7 +5,6 @@ go 1.17
 require (
 	github.com/garyburd/redigo v1.6.0
 	github.com/gin-gonic/gin v1.7.3
-	github.com/go-sql-driver/mysql v1.4.1
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/panjf2000/ants/v2 v2.4.8
 	github.com/patrickmn/go-cache v2.1.0+incompatible
@@ -39,7 +38,6 @@ require (
 	golang.org/x/text v0.3.6 // indirect
 	golang.org/x/tools v0.1.1 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
-	google.golang.org/appengine v1.6.1 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
