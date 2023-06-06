@@ -1,0 +1,38 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rssx-ui
+  namespace: default # 声明工作空间，默认为 default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: rssx-ui
+  template:
+    metadata:
+      labels:
+        name: rssx-ui
+    spec:
+      containers:
+        - name: rssx-ui-container
+          image: registry.wiloon.com/rssx-ui:v0.0.1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80 # containerPort 是声明容器内部的port
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rssx-ui-service
+  namespace: default  # 声明工作空间，默认为default
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 18082 # Service暴露在cluster-ip上的端口，通过<cluster-ip>:port访问服务,通过此端口集群内的服务可以相互访问
+      targetPort: 80 # Pod的外部访问端口，port和nodePort的数据通过这个端口进入到Pod内部，Pod里面的containers的端口映射到这个端口，提供服务
+      nodePort: 31082 # Node节点的端口，<nodeIP>:nodePort 是提供给集群外部客户访问service的入口
+  selector:
+    name: rssx-ui

@@ -1,0 +1,22 @@
+[rssx]
+rss-sync-auto=true
+security-key="fa6ee430-ebf6-44f2-a18b-64d691cd2dae"
+
+[mysql]
+address="mysql.wiloon.com:3306"
+
+[redis]
+address="10.107.3.107:16379"
+
+[sync]
+# minute
+duration=60
+
+[news]
+expire-time="-720h"
+gc-duration="24h"
+
+[log]
+level="debug"
+path="/data/rssx/logs/"
+file-name="rssx.log"
