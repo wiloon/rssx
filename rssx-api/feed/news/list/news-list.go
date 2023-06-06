@@ -52,7 +52,7 @@ func NewsListKey(feedId int) string {
 // FindNewsListByRange 按索引取文章列表
 func FindNewsListByRange(key string, start, end int64) []string {
 	log.Debugf("find news list by rang, start: %v, end: %v", start, end)
-	var newsidList []string
+	var newsIdList []string
 
 	result, err := redisx.GetConn().Do("ZRANGE", key, start, end)
 	if err != nil {
@@ -62,10 +62,10 @@ func FindNewsListByRange(key string, start, end int64) []string {
 		b := v.([]byte)
 		newsId := string(b)
 		log.Info("news id: " + newsId)
-		newsidList = append(newsidList, newsId)
+		newsIdList = append(newsIdList, newsId)
 	}
-	log.Debugf("find news list by rang, start: %v, end: %v, list size: %v", start, end, len(newsidList))
-	return newsidList
+	log.Debugf("find news list by rang, start: %v, end: %v, list size: %v", start, end, len(newsIdList))
+	return newsIdList
 }
 
 // FinOneNewsByIndex 按索引取某一条文章的id
@@ -92,21 +92,6 @@ func FindNextId(feedId int, newsId string) string {
 	return nextNewsId
 }
 
-// FindPreviousNewsId 上一篇文章的id
-func FindPreviousNewsId(feedId int, newsId string) string {
-	var previousNewsId string
-	index := FindIndexById(feedId, newsId)
-	previousIndex := index - 1
-	foo, _ := redisx.GetConn().Do("ZRANGE", feedNewsKey(feedId), previousIndex, previousIndex)
-	if len(foo.([]interface{})) > 0 {
-		previousNewsId = string(foo.([]interface{})[0].([]byte))
-
-	} else {
-		previousNewsId = ""
-	}
-	return previousNewsId
-}
-
 // feed_news:12
 func feedNewsKey(feedId int) string {
 	key := FeedNewsKeyPrefix + strconv.Itoa(feedId)
@@ -118,9 +103,9 @@ func feedNewsKey(feedId int) string {
 const userFeedLatestReadIndex string = "read_index:"
 
 // GetLatestReadIndex
-//因为删除旧数据之后 索引值会变，所以用户 已读标记， 用score做为已读标记
-//按score取index
-//redis里保存 score, 取最新的未读索引时时先取score再用score取member,再用member取位置   -_-!!
+// 因为删除旧数据之后 索引值会变，所以用户 已读标记， 用score做为已读标记
+// 按score取index
+// redis里保存 score, 取最新的未读索引时时先取score再用score取member,再用member取位置   -_-!!
 func GetLatestReadIndex(userId string, feedId int) int64 {
 	log.Debugf("get latest read index, user id: %v, feed id: %v", userId, feedId)
 	score := 0
@@ -290,7 +275,8 @@ func LoadArticles(c *gin.Context) {
 
 }
 
-/**
+/*
+*
 找到用户下一个未读索引
 */
 func findNextUserUnReadIndex(feedId int, currentNewsIndex int64) int64 {

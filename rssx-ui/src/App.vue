@@ -5,6 +5,14 @@
       dense
     >
       <v-toolbar-title>RSSX</v-toolbar-title>
+      <v-btn
+        data-cy="logout-dialog"
+        v-on:click="logout"
+        class="navBtn"
+        depressed
+        v-if="this.$store.state.login">
+        退出
+      </v-btn>
     </v-app-bar>
 
     <v-main>

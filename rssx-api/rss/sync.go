@@ -1,10 +1,10 @@
 package rss
 
 import (
+	"crypto/tls"
 	"encoding/xml"
 	"github.com/panjf2000/ants/v2"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"rssx/feed"
 	"rssx/feed/news/list"
@@ -30,6 +30,7 @@ func Sync() {
 func syncFeeds() {
 	p, _ := ants.NewPoolWithFunc(2, syncOneFeed)
 	feedList := feeds.FindUserFeeds("0")
+	log.Debugf("user feed list: %v", len(*feedList))
 	for _, oneFeed := range *feedList {
 		log.Debugf("invoke ant pool, feed id: %d", oneFeed.Id)
 		err := p.Invoke(oneFeed)
@@ -44,6 +45,8 @@ func syncFeeds() {
 func syncOneFeed(data interface{}) {
 	oneFeed := data.(feed.Feed)
 	log.Infof("sync feed, id: %d, url: %s", oneFeed.Id, oneFeed.Url)
+	// insecure https
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	client := &http.Client{}
 	request, err := http.NewRequest("GET", oneFeed.Url, nil)
 	if err != nil {
@@ -67,9 +70,7 @@ func syncOneFeed(data interface{}) {
 
 	var remoteFeedBody []byte
 	if result.StatusCode == http.StatusOK {
-		remoteFeedBody, _ = ioutil.ReadAll(result.Body)
-		//bodyString := string(remoteFeedBody) //todo if debug enabled convert to string
-		// log.Debug("get feed OK, feed body:", bodyString)
+		remoteFeedBody, _ = io.ReadAll(result.Body)
 	}
 
 	rss := Rss{}
@@ -84,7 +85,7 @@ func syncOneFeed(data interface{}) {
 		url := rssItem.Link
 		guid := rssItem.Guid
 
-		log.Debugf("index:%v, title:%v, guid:%v", i, string(rssItem.Title), guid)
+		log.Debugf("index:%v, title:%v, guid: %v", i, rssItem.Title, guid)
 
 		if strings.EqualFold(guid, "") {
 			guid = rssItem.Link
