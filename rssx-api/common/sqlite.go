@@ -12,6 +12,8 @@ import (
 
 var DB *gorm.DB
 
+const rssxDb = "/var/lib/rssx-api/rssx-api.db"
+
 func init() {
 	newLogger := logger.New(
 		log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
@@ -23,10 +25,10 @@ func init() {
 		},
 	)
 	var err error
-	DB, err = gorm.Open(sqlite.Open("/var/lib/rssx-api/rssx-api.db"), &gorm.Config{
+	DB, err = gorm.Open(sqlite.Open(rssxDb), &gorm.Config{
 		Logger: newLogger,
 	})
 	if err != nil {
-		zapLog.Error("failed to init db")
+		zapLog.Error("failed to init db: %s", rssxDb)
 	}
 }
