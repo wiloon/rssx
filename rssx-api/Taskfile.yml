@@ -1,0 +1,18 @@
+version: '3'
+
+tasks:
+  run:
+    desc: 在本地启动 RSSX API 服务
+    cmds:
+      - go run rssx-api.go
+
+  test:
+    desc: 运行所有测试
+    cmds:
+      - go test ./...
+
+  deps:
+    desc: 下载依赖
+    cmds:
+      - go mod download
+      - go mod tidy
