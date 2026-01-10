@@ -1,6 +1,10 @@
 version: '3'
 
 tasks:
+  default:
+    cmds:
+      - task --list
+
   run:
     desc: 在本地启动 RSSX API 服务
     cmds:
