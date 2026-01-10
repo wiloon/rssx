@@ -15,5 +15,6 @@
 .idea
 osChina.xml
 *.log
+.env
 rssx-ui/node_modules
 **/dist
