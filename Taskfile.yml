@@ -1,0 +1,29 @@
+version: '3'
+
+tasks:
+  default:
+    cmds:
+      - task --list
+
+  api:run:
+    desc: 启动 RSSX API 服务
+    dir: rssx-api
+    cmds:
+      - go run rssx-api.go
+
+  api:stop:
+    desc: 停止 RSSX API 服务
+    cmds:
+      - lsof -ti :8080 | xargs kill -9 2>/dev/null || echo "No API process running on port 8080"
+
+  ui:install:
+    desc: 安装 UI 依赖（使用 pnpm + fnm）
+    dir: rssx-ui
+    cmds:
+      - fnm exec --using=18 pnpm install
+
+  ui:run:
+    desc: 启动 RSSX UI 开发服务器
+    dir: rssx-ui
+    cmds:
+      - fnm exec --using=18 pnpm serve

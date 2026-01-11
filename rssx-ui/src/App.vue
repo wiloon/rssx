@@ -33,7 +33,7 @@ export default class App extends Vue {
   env = ''
 
   mounted () {
-    this.env = process.env.NODE_ENV
+    this.env = process.env.NODE_ENV || 'development'
     console.log('mounted: ' + process.env.NODE_ENV)
   }
 }
