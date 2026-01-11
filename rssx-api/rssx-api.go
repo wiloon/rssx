@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
+	"os"
 	"rssx/feed/news/list"
 	"rssx/feeds"
 	"rssx/rss"
@@ -9,6 +9,8 @@ import (
 	"rssx/utils"
 	"rssx/utils/config"
 	log "rssx/utils/logger"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -42,6 +44,7 @@ func main() {
 	err := router.Run(":8080")
 	if err != nil {
 		log.Errorf("failed to start rssx: %v", err)
+		os.Exit(1)
 	}
 	log.Info("rssx started and listening default port of gin")
 	utils.WaitSignals()

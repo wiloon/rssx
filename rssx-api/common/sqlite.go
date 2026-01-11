@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"rssx/utils/config"
 	zapLog "rssx/utils/logger"
 	"time"
 
@@ -13,8 +14,6 @@ import (
 )
 
 var DB *gorm.DB
-
-const rssxDb = "/var/lib/rssx-api/rssx-api.db"
 
 // User 用户表
 type User struct {
@@ -43,6 +42,13 @@ type News struct {
 	Score       int64
 }
 
+// UserFeed 用户订阅表
+type UserFeed struct {
+	UserId string `gorm:"index;not null"`
+	FeedId int64  `gorm:"index;not null"`
+	Sort   int    `gorm:"default:0"`
+}
+
 func init() {
 	newLogger := logger.New(
 		log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
@@ -53,6 +59,9 @@ func init() {
 			Colorful:                  true,        // Disable color
 		},
 	)
+
+	// 从配置读取数据库路径，默认为 /var/lib/rssx-api/rssx-api.db
+	rssxDb := config.GetString("sqlite.path", "/var/lib/rssx-api/rssx-api.db")
 
 	// 确保数据库目录存在
 	dbDir := filepath.Dir(rssxDb)
@@ -70,7 +79,7 @@ func init() {
 	}
 
 	// 自动迁移数据库表结构
-	err = DB.AutoMigrate(&User{}, &Feed{}, &News{})
+	err = DB.AutoMigrate(&User{}, &Feed{}, &News{}, &UserFeed{})
 	if err != nil {
 		zapLog.Error("failed to auto migrate tables, error: %v", err)
 		return
