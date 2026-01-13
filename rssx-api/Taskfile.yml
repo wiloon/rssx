@@ -20,3 +20,8 @@ tasks:
     cmds:
       - go mod download
       - go mod tidy
+
+  reset-password:
+    desc: "重置用户密码 (用法: task reset-password USER=用户名 PASSWORD=密码)"
+    cmds:
+      - go run tools/reset_password.go -user {{.USER}} -password {{.PASSWORD}}

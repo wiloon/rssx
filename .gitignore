@@ -18,3 +18,4 @@ osChina.xml
 .env
 rssx-ui/node_modules
 **/dist
+rssx-api/data/*.db
