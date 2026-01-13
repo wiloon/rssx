@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"log"
 
+	"rssx/utils/config"
+
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"rssx/utils/config"
 )
 
 type User struct {
