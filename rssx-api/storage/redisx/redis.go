@@ -1,11 +1,12 @@
 package redisx
 
 import (
-	"github.com/garyburd/redigo/redis"
 	"rssx/utils/config"
 	log "rssx/utils/logger"
 	"strconv"
 	"time"
+
+	"github.com/garyburd/redigo/redis"
 )
 
 var pool *redis.Pool
@@ -23,10 +24,23 @@ func GetConn() redis.Conn {
 		pool = &redis.Pool{MaxIdle: 4, IdleTimeout: 60 * time.Second, Dial: func() (redis.Conn, error) {
 			var err error
 			address := config.GetString("redis.address", "127.0.0.1:6379")
+			password := config.GetString("redis.password", "")
+
 			conn, err := redis.Dial("tcp", address)
 			if err != nil {
-				log.Errorf("failed to connect to redis:" + err.Error())
+				log.Errorf("failed to connect to redis: " + err.Error())
+				return nil, err
 			}
+
+			// 如果有密码，进行认证
+			if password != "" {
+				if _, err := conn.Do("AUTH", password); err != nil {
+					conn.Close()
+					log.Errorf("failed to auth redis: " + err.Error())
+					return nil, err
+				}
+			}
+
 			log.Debugf("connected to redis, address: %v", address)
 			return conn, err
 		}}

@@ -1,6 +1,10 @@
 version: '3'
 
 tasks:
+  default:
+    cmds:
+      - task --list
+
   run:
     desc: 在本地启动 RSSX API 服务
     cmds:
@@ -16,6 +20,11 @@ tasks:
     cmds:
       - go mod download
       - go mod tidy
+
+  reset-password:
+    desc: "重置用户密码 (用法: task reset-password USER=用户名 PASSWORD=密码)"
+    cmds:
+      - go run tools/reset_password.go -user {{.USER}} -password {{.PASSWORD}}
 
   container:build:
     desc: 编译 Go 二进制文件
