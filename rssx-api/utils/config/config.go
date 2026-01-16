@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -69,6 +70,14 @@ func getConfigFilePath(configPath string) string {
 	return filepath.Join(configPath, defaultFileName)
 }
 
+// tomlKeyToEnvKey 将 TOML key 转换为环境变量名
+// 例如: rssx.rss-sync-auto -> RSSX_RSS_SYNC_AUTO
+func tomlKeyToEnvKey(key string) string {
+	envKey := strings.ReplaceAll(key, ".", "_")
+	envKey = strings.ReplaceAll(envKey, "-", "_")
+	return strings.ToUpper(envKey)
+}
+
 func GetInt(key string) int64 {
 	var foo int64
 	foo = -1
@@ -84,6 +93,13 @@ func GetBool(key string) bool {
 //}
 
 func GetString(key string, def string) string {
+	// 优先从环境变量读取
+	envKey := tomlKeyToEnvKey(key)
+	if envValue := os.Getenv(envKey); envValue != "" {
+		return envValue
+	}
+
+	// 回退到配置文件
 	var value string
 	if conf == nil {
 		value = def
@@ -96,12 +112,19 @@ func GetString(key string, def string) string {
 		}
 	}
 
-	// log.Printf("key: %s, value: %s", key, value)
-
 	return value
 }
 
 func GetIntWithDefaultValue(key string, def int64) int64 {
+	// 优先从环境变量读取
+	envKey := tomlKeyToEnvKey(key)
+	if envValue := os.Getenv(envKey); envValue != "" {
+		if intValue, err := strconv.ParseInt(envValue, 10, 64); err == nil {
+			return intValue
+		}
+	}
+
+	// 回退到配置文件
 	var value int64
 	if conf == nil {
 		return def
@@ -120,7 +143,19 @@ func GetIntWithDefaultValue(key string, def int64) int64 {
 }
 
 func GetBoolWithDefaultValue(key string, def bool) bool {
+	// 优先从环境变量读取
+	envKey := tomlKeyToEnvKey(key)
+	if envValue := os.Getenv(envKey); envValue != "" {
+		if boolValue, err := strconv.ParseBool(envValue); err == nil {
+			return boolValue
+		}
+	}
+
+	// 回退到配置文件
 	var result bool
+	if conf == nil {
+		return def
+	}
 	obj := conf.Get(key)
 	if obj == nil {
 		result = def

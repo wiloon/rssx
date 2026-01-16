@@ -1,0 +1,33 @@
+FROM alpine:3.19
+
+LABEL maintainer="wiloon <wiloon.wy@gmail.com>"
+
+# 添加时区数据和 CA 证书 (抓取 HTTPS RSS feed 时需要验证证书)
+RUN apk add --no-cache ca-certificates tzdata
+
+# 配置通过环境变量设置，key 格式: TOML key 中 . 和 - 替换为 _，转大写
+# 例如: rssx.rss-sync-auto -> RSSX_RSS_SYNC_AUTO
+
+# 是否自动启动 RSS feed 同步任务
+ENV RSSX_RSS_SYNC_AUTO=true
+# JWT 签名密钥
+ENV RSSX_SECURITY_KEY=""
+# Redis 地址 (host:port)
+ENV REDIS_ADDRESS=""
+# RSS 同步间隔 (分钟)
+ENV SYNC_DURATION=60
+# 新闻过期时间 (负数表示多久前的新闻会过期)
+ENV NEWS_EXPIRE_TIME="-720h"
+# 过期新闻清理周期
+ENV NEWS_GC_DURATION="24h"
+# 日志级别 (debug/info/warn/error)
+ENV LOG_LEVEL="info"
+# 日志文件目录
+ENV LOG_PATH="/data/rssx/logs/"
+# 日志文件名
+ENV LOG_FILE_NAME="rssx.log"
+
+COPY rssx-api /usr/local/bin/
+COPY rssx-api.db /var/lib/rssx-api/rssx-api.db
+
+CMD ["/usr/local/bin/rssx-api"]
