@@ -17,3 +17,6 @@ osChina.xml
 *.log
 rssx-ui/node_modules
 **/dist
+
+# 环境变量配置 (包含敏感信息)
+.env
