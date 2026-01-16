@@ -1,0 +1,35 @@
+version: '3'
+
+tasks:
+  default:
+    cmds:
+      - task --list
+
+  api:run:
+    desc: 启动 RSSX API 服务
+    dir: rssx-api
+    cmds:
+      - go run rssx-api.go
+
+  api:stop:
+    desc: 停止 RSSX API 服务
+    cmds:
+      - lsof -ti :8080 | xargs kill -9 2>/dev/null || echo "No API process running on port 8080"
+
+  api:reset-password:
+    desc: "重置用户密码 (用法: task api:reset-password USER=用户名 PASSWORD=密码)"
+    dir: rssx-api
+    cmds:
+      - task reset-password USER={{.USER}} PASSWORD={{.PASSWORD}}
+
+  ui:install:
+    desc: 安装 UI 依赖（使用 pnpm + fnm）
+    dir: rssx-ui
+    cmds:
+      - fnm exec --using=18 pnpm install
+
+  ui:run:
+    desc: 启动 RSSX UI 开发服务器
+    dir: rssx-ui
+    cmds:
+      - fnm exec --using=18 pnpm serve
