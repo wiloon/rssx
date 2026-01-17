@@ -27,17 +27,17 @@ tasks:
       - go run tools/reset_password.go -user {{.USER}} -password {{.PASSWORD}}
 
   container:build:
-    desc: 编译 Go 二进制文件
+    desc: 编译容器镜像
     cmds:
-      - CGO_ENABLED=0 GOOS=linux go build -o rssx-api rssx-api.go
+      - sudo nerdctl build -f Containerfile -t rssx-api:latest .
 
   container:image:
     desc: 编译容器镜像
     deps: [container:build]
     cmds:
-      - nerdctl build -f Containerfile -t rssx-api:latest .
+      - sudo nerdctl build -f Containerfile -t rssx-api:latest .
 
   container:run:
     desc: 运行容器 (需要先创建 .env 文件)
     cmds:
-      - nerdctl run --rm --env-file .env -p 8080:8080 rssx-api:latest
+      - sudo nerdctl run --rm --env-file .env -p 8080:8080 rssx-api:latest
