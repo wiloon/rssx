@@ -1,33 +1,88 @@
+# ==========================================
+# Build stage
+# ==========================================
+FROM golang:1.25-alpine AS builder
+
+LABEL maintainer="wiloon <wiloon.wy@gmail.com>"
+
+# Install build dependencies
+RUN apk add --no-cache git ca-certificates tzdata
+
+# Set working directory
+WORKDIR /build
+
+# Optimize dependency caching: copy go.mod and go.sum first
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build binary with pure Go (no CGO)
+# CGO_ENABLED=0: Pure Go build, no C dependencies
+# -ldflags="-s -w": Strip debug info to reduce binary size
+# -trimpath: Remove file system paths for reproducible builds
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-s -w" \
+    -trimpath \
+    -o rssx-api \
+    rssx-api.go
+
+# ==========================================
+# Runtime stage
+# ==========================================
 FROM alpine:3.19
 
 LABEL maintainer="wiloon <wiloon.wy@gmail.com>"
 
-# 添加时区数据和 CA 证书 (抓取 HTTPS RSS feed 时需要验证证书)
-RUN apk add --no-cache ca-certificates tzdata
+# Add timezone data and CA certificates (needed for HTTPS RSS feed validation)
+RUN apk add --no-cache ca-certificates tzdata wget && \
+    # Create non-root user
+    addgroup -g 1000 rssx && \
+    adduser -D -u 1000 -G rssx rssx && \
+    # Create necessary directories
+    mkdir -p /data/rssx/logs /var/lib/rssx-api && \
+    chown -R rssx:rssx /data/rssx /var/lib/rssx-api
 
-# 配置通过环境变量设置，key 格式: TOML key 中 . 和 - 替换为 _，转大写
-# 例如: rssx.rss-sync-auto -> RSSX_RSS_SYNC_AUTO
+# Configuration via environment variables
+# Format: Replace . and - in TOML keys with _, convert to uppercase
+# Example: rssx.rss-sync-auto -> RSSX_RSS_SYNC_AUTO
 
-# 是否自动启动 RSS feed 同步任务
+# Auto-start RSS feed sync task
 ENV RSSX_RSS_SYNC_AUTO=true
-# JWT 签名密钥
+# JWT signing key
 ENV RSSX_SECURITY_KEY=""
-# Redis 地址 (host:port)
+# Redis address (host:port)
 ENV REDIS_ADDRESS=""
-# RSS 同步间隔 (分钟)
+# RSS sync interval (minutes)
 ENV SYNC_DURATION=60
-# 新闻过期时间 (负数表示多久前的新闻会过期)
+# News expiration time (negative means how long ago news expires)
 ENV NEWS_EXPIRE_TIME="-720h"
-# 过期新闻清理周期
+# News garbage collection interval
 ENV NEWS_GC_DURATION="24h"
-# 日志级别 (debug/info/warn/error)
+# Log level (debug/info/warn/error)
 ENV LOG_LEVEL="info"
-# 日志文件目录
+# Log file directory
 ENV LOG_PATH="/data/rssx/logs/"
-# 日志文件名
+# Log file name
 ENV LOG_FILE_NAME="rssx.log"
+# SQLite database path
+ENV SQLITE_PATH="/var/lib/rssx-api/rssx-api.db"
 
-COPY rssx-api /usr/local/bin/
-COPY rssx-api.db /var/lib/rssx-api/rssx-api.db
+WORKDIR /app
+
+# Copy binary from build stage
+COPY --from=builder /build/rssx-api /usr/local/bin/rssx-api
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+
+# Switch to non-root user
+USER rssx
+
+# Expose port
+EXPOSE 8080
+
+# Health check using /ping endpoint
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/ping || exit 1
 
 CMD ["/usr/local/bin/rssx-api"]

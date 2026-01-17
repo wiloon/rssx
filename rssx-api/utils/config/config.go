@@ -55,7 +55,11 @@ func LoadLocalConfig(configFileName string) {
 	defaultFileName = configFileName
 
 	configFilePath = configPath()
-	LoadConfigByPath(configFilePath)
+	if configFilePath != "" {
+		LoadConfigByPath(configFilePath)
+	} else {
+		log.Println("no config file found, using environment variables only")
+	}
 }
 
 func LoadConfigByPath(fullPath string) {
@@ -126,6 +130,7 @@ func GetString(key string, def string) string {
 	var value string
 	if conf == nil {
 		value = def
+		log.Printf("key: %s, using default value: %s (no config file)", key, def)
 	} else {
 		obj := conf.Get(key)
 		if obj == nil {
@@ -134,8 +139,6 @@ func GetString(key string, def string) string {
 			value = obj.(string)
 		}
 	}
-
-	// log.Printf("key: %s, value: %s", key, value)
 
 	return value
 }
@@ -158,20 +161,18 @@ func GetIntWithDefaultValue(key string, def int64) int64 {
 	}
 
 	// Fall back to TOML config
-	var value int64
 	if conf == nil {
+		log.Printf("key: %s, using default value: %v (no config file)", key, def)
 		return def
 	}
 
 	k := conf.Get(key)
 	if k == nil {
-		value = def
-	} else {
-		value = k.(int64)
+		return def
 	}
 
+	value := k.(int64)
 	log.Printf("key: %s, value: %v", key, value)
-
 	return value
 }
 
@@ -187,6 +188,11 @@ func GetBoolWithDefaultValue(key string, def bool) bool {
 	}
 
 	// Fall back to TOML config
+	if conf == nil {
+		log.Printf("key: %s, using default value: %v (no config file)", key, def)
+		return def
+	}
+
 	var result bool
 	obj := conf.Get(key)
 	if obj == nil {
