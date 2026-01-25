@@ -3,7 +3,7 @@ rss-sync-auto=true
 security-key="fa6ee430-ebf6-44f2-a18b-64d691cd2dae"
 
 [sqlite]
-path="/var/lib/rssx-api/rssx-api.db"
+path="/data/rssx/rssx.db"
 
 [mysql]
 address="mysql.wiloon.com:3306"

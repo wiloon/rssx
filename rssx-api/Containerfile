@@ -26,8 +26,9 @@ ENV LOG_LEVEL="info"
 ENV LOG_PATH="/data/rssx/logs/"
 # 日志文件名
 ENV LOG_FILE_NAME="rssx.log"
+# 数据库路径
+ENV DATABASE_PATH="/data/rssx/rssx.db"
 
 COPY rssx-api /usr/local/bin/
-COPY rssx-api.db /var/lib/rssx-api/rssx-api.db
 
 CMD ["/usr/local/bin/rssx-api"]

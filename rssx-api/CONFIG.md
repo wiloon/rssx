@@ -24,7 +24,7 @@ cp .env.example .env
 ```yaml
 # docker-compose.yml 示例
 environment:
-  - SQLITE_PATH=/data/rssx-api.db
+  - DATABASE_PATH=/data/rssx/rssx.db
   - REDIS_ADDRESS=redis:6379
   - RSSX_RSS_SYNC_AUTO=true
   - LOG_LEVEL=info
@@ -35,8 +35,8 @@ environment:
 
 ```yaml
 env:
-  - name: SQLITE_PATH
-    value: /data/rssx-api.db
+  - name: DATABASE_PATH
+    value: /data/rssx/rssx.db
   - name: REDIS_ADDRESS
     value: redis-service:6379
 ```
@@ -45,7 +45,8 @@ env:
 
 | 环境变量 | 说明 | 默认值 | 示例 |
 |---------|------|--------|------|
-| `SQLITE_PATH` | SQLite 数据库文件路径 | `/var/lib/rssx-api/rssx-api.db` | `./data/rssx-api.db` |
+| `DATABASE_PATH` | 数据库文件路径（环境变量优先） | `/data/rssx/rssx.db` | `./data/rssx.db` |
+| `SQLITE_PATH` | SQLite 数据库文件路径（配置文件） | `/data/rssx/rssx.db` | `./data/rssx.db` |
 | `REDIS_ADDRESS` | Redis 地址 | `127.0.0.1:6379` | `redis:6379` |
 | `RSSX_RSS_SYNC_AUTO` | 是否自动同步 RSS | `true` | `true/false` |
 | `RSSX_SECURITY_KEY` | 安全密钥 | 无 | 任意字符串 |
