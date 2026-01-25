@@ -53,7 +53,7 @@ func main() {
 	// 获取数据库路径：优先使用命令行参数，否则从配置文件读取
 	finalDbPath := *dbPath
 	if finalDbPath == "" {
-		finalDbPath = config.GetString("sqlite.path", "./data/rssx-api.db")
+		finalDbPath = config.GetString("sqlite.path", "./data/rssx.db")
 	}
 	fmt.Printf("数据库路径: %s\n", finalDbPath)
 
