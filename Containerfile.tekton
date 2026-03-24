@@ -1,14 +1,14 @@
 # ============================================
 # Stage 1: Build Go binary
 # ============================================
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 LABEL maintainer="wiloon <wiloon.wy@gmail.com>"
 
 WORKDIR /build
 
 # 安装构建依赖
-RUN apk add --no-cache git gcc musl-dev sqlite-dev
+RUN apk add --no-cache git ca-certificates tzdata
 
 # 复制 go.mod 和 go.sum（利用缓存）
 COPY rssx-api/go.mod rssx-api/go.sum ./
@@ -17,11 +17,11 @@ RUN go mod download
 # 复制源代码
 COPY rssx-api/ ./
 
-# 构建二进制文件
-# CGO_ENABLED=1 因为 SQLite 需要 CGO
-# -ldflags="-w -s" 减小二进制文件大小
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
-    go build -ldflags="-w -s" -o rssx-api .
+# 构建二进制文件（纯 Go，不依赖 CGO）
+# -ldflags="-s -w" 减小二进制文件大小
+# -trimpath 生成可重现构建
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-s -w" -trimpath -o rssx-api .
 
 # 验证二进制文件
 RUN chmod +x /build/rssx-api
@@ -37,7 +37,7 @@ LABEL maintainer="wiloon <wiloon.wy@gmail.com>"
 RUN apk add --no-cache \
     ca-certificates \
     tzdata \
-    sqlite-libs
+    wget
 
 # 设置时区
 ENV TZ=Asia/Shanghai
