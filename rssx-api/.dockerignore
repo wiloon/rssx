@@ -1,0 +1,44 @@
+# Git 相关
+.git
+.gitignore
+.gitattributes
+
+# 文档
+README.md
+*.md
+CONFIG.md
+
+# 测试文件
+*_test.go
+test.sh
+
+# 构建产物
+rssx-api
+*.exe
+*.dll
+*.so
+*.dylib
+
+# 数据目录
+data/
+*.db-shm
+*.db-wal
+
+# 日志文件
+*.log
+logs/
+
+# IDE 配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 部署相关
+deploy/
+Taskfile.yml
+
+# 临时文件
+tmp/
+temp/
