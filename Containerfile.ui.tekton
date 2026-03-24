@@ -1,0 +1,29 @@
+# ============================================
+# Stage 1: Build Vue.js app
+# ============================================
+FROM node:18-alpine AS builder
+
+WORKDIR /build
+
+# Install pnpm globally
+RUN npm install -g pnpm
+
+# Copy package files (leverage layer cache)
+COPY rssx-ui/package.json rssx-ui/pnpm-lock.yaml ./
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY rssx-ui/ ./
+
+# Build production bundle
+RUN pnpm run build
+
+# ============================================
+# Stage 2: Nginx serving
+# ============================================
+FROM nginx:1.23.3-alpine
+
+COPY --from=builder /build/dist/ /usr/share/nginx/html/
+COPY rssx-ui/nginx-default.conf /etc/nginx/conf.d/default.conf
