@@ -143,9 +143,9 @@ func GetString(key string, def string) string {
 	return value
 }
 
-// toEnvKey converts a dotted key like "redis.address" to "REDIS_ADDRESS"
+// toEnvKey converts a dotted/hyphenated key like "rssx.rss-sync-auto" to "RSSX_RSS_SYNC_AUTO"
 func toEnvKey(key string) string {
-	envKey := strings.ToUpper(strings.ReplaceAll(key, ".", "_"))
+	envKey := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(key, ".", "_"), "-", "_"))
 	return envKey
 }
 
