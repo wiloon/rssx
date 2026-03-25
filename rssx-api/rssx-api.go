@@ -34,6 +34,8 @@ func main() {
 	})
 
 	router.GET("/feeds", feeds.LoadFeedList)
+	router.POST("/feeds", feeds.AddFeed)
+	router.DELETE("/feeds/:id", feeds.DeleteFeed)
 	router.GET("/news-list", list.LoadNewsList)
 	router.GET("/news", list.LoadArticles)
 	router.GET("/previous-news", list.PreviousArticle)
