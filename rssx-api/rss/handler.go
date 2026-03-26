@@ -4,9 +4,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"rssx/feeds"
 	log "rssx/utils/logger"
+
+	"github.com/gin-gonic/gin"
 )
 
 // SyncAll triggers an immediate sync of all feeds.

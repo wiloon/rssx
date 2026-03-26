@@ -5,7 +5,7 @@ A RSS Reader
 ## redis key
 ### 某一个feed的 所有 news id，按时间排序的
 key: feed_news:feedId0
-type: sort set， zset
+type: sort set，zset
 value: newsId
 
 ### 文章内容
