@@ -4,16 +4,17 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/patrickmn/go-cache"
-	"github.com/satori/go.uuid"
 	"rssx/utils"
 	"rssx/utils/config"
 	"rssx/utils/logger"
 	"rssx/utils/response"
-	"strings"
-	"time"
 )
 
 var tokenRefreshCache *cache.Cache
@@ -22,22 +23,25 @@ func init() {
 	tokenRefreshCache = cache.New(1*time.Minute, 10*time.Minute)
 }
 
+// RssxClaims is the custom claims structure for RSSX tokens.
+// In jwt/v5, we embed jwt.RegisteredClaims instead of using jwt.StandardClaims.
 type RssxClaims struct {
 	Id string `json:"id"`
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
+// NewToken generates a new JWT token for the given user ID.
+// The token expires in 1 day and uses HS256 signing method.
 func NewToken(id string) string {
-	// Create the Claims
 	claims := RssxClaims{
-		id,
-		jwt.StandardClaims{
-			Audience:  "rssx.wiloon.net",
-			ExpiresAt: utils.DateToSeconds(time.Now().AddDate(0, 0, 1)),
-			Id:        uuid.NewV4().String(),
-			IssuedAt:  utils.CurrentSeconds(),
+		Id: id,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Audience:  jwt.ClaimStrings{"rssx.wiloon.net"},
+			ExpiresAt: jwt.NewNumericDate(time.Now().AddDate(0, 0, 1)),
+			ID:        uuid.New().String(),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    "wiloon.com",
-			NotBefore: utils.CurrentSeconds(),
+			NotBefore: jwt.NewNumericDate(time.Now()),
 			Subject:   "rssx",
 		},
 	}
@@ -50,9 +54,25 @@ func NewToken(id string) string {
 	return signedString
 }
 
+// Payload represents the parsed JWT payload for API responses.
+type Payload struct {
+	Iss string // (issuer): issuer
+	Sub string // (subject): subject
+	Aud string // (audience): audience
+	Nbf int64  // (Not Before): not before timestamp
+	Exp int64  // (expiration time): expiration timestamp
+	Iat int64  // (Issued At): issued at timestamp
+	Jti string // (JWT ID): unique token ID
+	Id  string // user id
+}
+
+const DefaultIss = "wiloon.com"
+const DefaultSub = "rssx"
+
+// GetJwtToken creates a new JWT token with the given payload using HS512.
 func GetJwtToken(jwtPayload Payload) (token string, err error) {
 	jwtToken := jwt.NewWithClaims(
-		jwt.SigningMethodHS512, // method
+		jwt.SigningMethodHS512,
 		jwt.MapClaims{
 			"iss": jwtPayload.Iss,
 			"sub": jwtPayload.Sub,
@@ -67,84 +87,70 @@ func GetJwtToken(jwtPayload Payload) (token string, err error) {
 	return jwtToken.SignedString(keyBytes)
 }
 
-const DefaultIss = "wiloon.com"
-const DefaultSub = "rssx"
-
-type Payload struct {
-	Iss string // (issuer)：签发人
-	Sub string // (subject)：主题
-	Aud string // (audience)：受众
-	Nbf int64  // (Not Before)：生效时间
-	Exp int64  // (expiration time)：过期时间
-	Iat int64  // (Issued At)：签发时间
-	Jti string // (JWT ID)：编号
-	Id  string // user id
-
-}
-
-// ParseToken signature is invalid
-// Token is expired
+// ParseToken parses and validates a JWT token string.
+// Returns the parsed Payload or an error if the token is invalid.
+// Possible errors: token is expired, signature is invalid, or token is malformed.
 func ParseToken(tokenString string) (jwtPayload *Payload, err error) {
-	// Parse takes the token string and a function for looking up the key. The latter is especially
-	// useful if you use multiple keys for your application.  The standard is to use 'kid' in the
-	// head of the token to identify which key to use, but the parsed token (head and claims) is provided
-	// to the callback, providing flexibility.
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// Don't forget to validate the alg is what you expect:
+		// Validate the signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-
-		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
 		return config.GetString("security-key", ""), nil
 	})
 
-	claims, ok := token.Claims.(jwt.MapClaims)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse token: %w", err)
+	}
 
+	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		err = errors.New("cannot convert claim to mapclaim")
-		return
+		return nil, errors.New("cannot convert claim to mapclaim")
 	}
-	//验证token，如果token被修改过则为false
+
 	if !token.Valid {
-		err = errors.New("token is invalid")
-		return
+		return nil, errors.New("token is invalid")
 	}
-	if claims["iss"] != nil {
-		jwtPayload.Iss = claims["iss"].(string)
+
+	jwtPayload = &Payload{}
+
+	if iss, ok := claims["iss"].(string); ok {
+		jwtPayload.Iss = iss
 	}
-	if claims["sub"] != nil {
-		jwtPayload.Sub = claims["sub"].(string)
+	if sub, ok := claims["sub"].(string); ok {
+		jwtPayload.Sub = sub
 	}
-	if claims["aud"] != nil {
-		jwtPayload.Sub = claims["aud"].(string)
+	if aud, ok := claims["aud"].(string); ok {
+		jwtPayload.Aud = aud
 	}
-	if claims["nbf"] != nil {
-		jwtPayload.Nbf = int64(claims["nbf"].(float64))
+	if nbf, ok := claims["nbf"].(float64); ok {
+		jwtPayload.Nbf = int64(nbf)
 	}
-	if claims["exp"] != nil {
-		jwtPayload.Exp = int64(claims["exp"].(float64))
+	if exp, ok := claims["exp"].(float64); ok {
+		jwtPayload.Exp = int64(exp)
 	}
-	if claims["iat"] != nil {
-		jwtPayload.Iat = int64(claims["iat"].(float64))
+	if iat, ok := claims["iat"].(float64); ok {
+		jwtPayload.Iat = int64(iat)
 	}
-	if claims["jti"] != nil {
-		jwtPayload.Jti = claims["jti"].(string)
+	if jti, ok := claims["jti"].(string); ok {
+		jwtPayload.Jti = jti
 	}
-	if claims["id"] != nil {
-		jwtPayload.Id = claims["id"].(string)
+	if id, ok := claims["id"].(string); ok {
+		jwtPayload.Id = id
 	}
-	return jwtPayload, err
+
+	return jwtPayload, nil
 }
 
 func secret() jwt.Keyfunc {
 	return func(token *jwt.Token) (i interface{}, e error) {
 		keyBytes, _ := base64.RawURLEncoding.DecodeString(config.GetString("security-key", ""))
-		return []byte(keyBytes), nil
+		return keyBytes, nil
 	}
 }
 
-// token刷新, 处理token快过期的时候 自动 刷新 ,防止用户操作中断
+// RefreshToken handles token refresh when a token is about to expire.
+// It prevents user interruption during active usage.
 func RefreshToken(c *gin.Context) {
 	logger.Debugf("refresh token")
 	data := make(map[string]string)
@@ -165,6 +171,8 @@ func RefreshToken(c *gin.Context) {
 	response.ShowData(c, data)
 }
 
+// GetJwtTokenFromHeader extracts the JWT token from the Authorization header.
+// Expected format: "Bearer <token>"
 func GetJwtTokenFromHeader(c *gin.Context) string {
 	token := ""
 	tokenStr := c.GetHeader("Authorization")
@@ -173,10 +181,10 @@ func GetJwtTokenFromHeader(c *gin.Context) string {
 	if len(arr) >= 2 {
 		token = arr[1]
 	}
-	// logger.Debugf("get token from header, url: %s, token: %s", c.Request.RequestURI, token)
 	return token
 }
 
+// GetUserId extracts the user ID from the JWT token in the request header.
 func GetUserId(c *gin.Context) string {
 	token := GetJwtTokenFromHeader(c)
 	p, err := ParseToken(token)
@@ -187,6 +195,7 @@ func GetUserId(c *gin.Context) string {
 	return p.Id
 }
 
+// GetId is an alias for GetUserId.
 func GetId(c *gin.Context) string {
 	p := GetJwtPayLoad(c)
 	if p != nil {
@@ -195,6 +204,7 @@ func GetId(c *gin.Context) string {
 	return ""
 }
 
+// GetJwtPayLoad parses and returns the JWT payload from the request.
 func GetJwtPayLoad(c *gin.Context) *Payload {
 	token := GetJwtTokenFromHeader(c)
 	if token != "" {
@@ -206,10 +216,13 @@ func GetJwtPayLoad(c *gin.Context) *Payload {
 	return nil
 }
 
+// TokenNotExist returns true if no JWT token is present in the request header.
 func TokenNotExist(c *gin.Context) bool {
 	return GetJwtTokenFromHeader(c) == ""
 }
 
+// CheckAndRefreshToken checks if the token needs refresh (expires within 5 minutes)
+// and sets the refresh-token header if needed.
 func CheckAndRefreshToken(c *gin.Context) *Payload {
 	logger.Debugf("check if token need refresh")
 	p := GetJwtPayLoad(c)
@@ -244,7 +257,6 @@ func checkIfTokenNeedRefresh(p *Payload) (bool, error) {
 			}
 		}
 		tokenNeedRefresh = true
-		// refresh token
 		tokenRefreshCache.Set(redisKey, time.Now(), cache.DefaultExpiration)
 		logger.Infof("token refresh check, token need refresh, duration till exp: %v", d0)
 	} else {
@@ -270,7 +282,6 @@ func refreshTokenByExp(p *Payload) (string, error) {
 				return newToken, e
 			}
 		}
-		// refresh token
 		logger.Debugf("refresh token, user type: %v, uuid: %v, open id: %v", p.Id)
 		newToken = New(p.Id)
 		tokenRefreshCache.Set(redisKey, time.Now(), cache.DefaultExpiration)
@@ -281,17 +292,18 @@ func refreshTokenByExp(p *Payload) (string, error) {
 	return newToken, nil
 }
 
+// New generates a new JWT token with 8-hour expiration.
+// This is used for the RefreshToken flow.
 func New(id string) string {
 	tokenDuration, _ := time.ParseDuration("8h")
 	jwtPayload := Payload{
-		Iss: "wiloon.com",
-		Sub: "rssx",
+		Iss: DefaultIss,
+		Sub: DefaultSub,
 		Nbf: utils.CurrentSeconds(),
 		Exp: utils.DateToSeconds(time.Now().Add(tokenDuration)),
 		Iat: utils.CurrentSeconds(),
-		Jti: uuid.NewV4().String(),
-
-		Id: id,
+		Jti: uuid.New().String(),
+		Id:  id,
 	}
 
 	token, err := GetJwtToken(jwtPayload)
@@ -301,6 +313,8 @@ func New(id string) string {
 	return token
 }
 
+// IsValidToken validates the JWT token in the request header.
+// Returns true if the token is valid, false otherwise.
 func IsValidToken(c *gin.Context) bool {
 	valid := true
 	defer func() {
@@ -323,7 +337,6 @@ func IsValidToken(c *gin.Context) bool {
 		err = errors.New("cannot convert claim to mapclaim")
 		valid = false
 	}
-	//验证token，如果token被修改过则为false
 	if !token.Valid {
 		err = errors.New("token is invalid")
 		valid = false
@@ -332,17 +345,18 @@ func IsValidToken(c *gin.Context) bool {
 	return valid
 }
 
+// TokenBuilder helps construct JWT tokens with common fields.
 type TokenBuilder struct {
 	payload Payload
 }
 
-func (t *TokenBuilder) makeCommonFiles(id, groupId, dealerId string) {
+// MakeCommonFiles sets up the common payload fields for a token.
+func (t *TokenBuilder) MakeCommonFiles(id string) {
 	t.payload.Iss = DefaultIss
 	t.payload.Sub = DefaultSub
 	t.payload.Nbf = utils.CurrentSeconds()
 	t.payload.Exp = utils.DateToSeconds(time.Now().AddDate(0, 0, 1))
 	t.payload.Iat = utils.CurrentSeconds()
-	t.payload.Jti = uuid.NewV4().String()
+	t.payload.Jti = uuid.New().String()
 	t.payload.Id = id
-
 }
