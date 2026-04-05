@@ -1,7 +1,7 @@
 package user
 
 import (
-	uuid "github.com/satori/go.uuid"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"rssx/common"
 	"rssx/utils"
@@ -35,7 +35,7 @@ func (u *User) IsExist() bool {
 
 func (u *User) Register() {
 	u.CreateTime = utils.CurrentDateString()
-	u.Id = uuid.NewV4().String()
+	u.Id = uuid.New().String()
 	common.DB.Create(u)
 }
 

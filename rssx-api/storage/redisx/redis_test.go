@@ -4,7 +4,7 @@ import (
 	"crypto/md5"
 	"crypto/sha256"
 	"fmt"
-	"github.com/satori/go.uuid"
+	"github.com/google/uuid"
 	"os"
 	"rssx/utils"
 	"rssx/utils/config"
@@ -19,7 +19,7 @@ func TestUUID(t *testing.T) {
 	rootUUID, _ := uuid.FromString("5e4a8cfe-73df-4ca6-8089-18c189cc1aa3")
 
 	for i := 0; i < 10; i++ {
-		newsUUID := uuid.NewV5(rootUUID, "news_id")
+		newsUUID := uuid.NewMD5(rootUUID, []byte("news_id"))
 		fmt.Println(newsUUID)
 	}
 
