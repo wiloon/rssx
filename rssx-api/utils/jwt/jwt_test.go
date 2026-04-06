@@ -301,6 +301,177 @@ func TestTokenBuilder_MakeCommonFiles(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Business-layer tests — cover PR-changed code in jwt.go
+// ---------------------------------------------------------------------------
+
+// TestNewToken_Claims verifies that NewToken produces a well-formed JWT containing
+// all required claims using jwt.RegisteredClaims (jwt/v5 change from StandardClaims).
+func TestNewToken_Claims(t *testing.T) {
+	const key = "test-rssx-security-key"
+	t.Setenv("RSSX_SECURITY_KEY", key)
+
+	token := NewToken("user-id-xyz")
+	if token == "" {
+		t.Fatal("expected non-empty token string")
+	}
+
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		t.Fatalf("expected 3 JWT parts, got %d", len(parts))
+	}
+
+	parser := jwt.NewParser()
+	parsed, _, err := parser.ParseUnverified(token, jwt.MapClaims{})
+	if err != nil {
+		t.Fatalf("token is malformed: %v", err)
+	}
+
+	mc := parsed.Claims.(jwt.MapClaims)
+
+	if mc["id"] != "user-id-xyz" {
+		t.Errorf("id: expected user-id-xyz, got %v", mc["id"])
+	}
+	if mc["iss"] != "wiloon.com" {
+		t.Errorf("iss: expected wiloon.com, got %v", mc["iss"])
+	}
+	if mc["sub"] != "rssx" {
+		t.Errorf("sub: expected rssx, got %v", mc["sub"])
+	}
+	if mc["jti"] == nil || mc["jti"] == "" {
+		t.Error("jti must be set and non-empty")
+	}
+	if mc["exp"] == nil {
+		t.Error("exp claim must be set")
+	}
+	// MapClaims decodes JSON arrays as []interface{}
+	aud, ok := mc["aud"].([]interface{})
+	if !ok || len(aud) != 1 || aud[0] != "rssx.wiloon.net" {
+		t.Errorf("aud: expected [rssx.wiloon.net], got %v (type %T)", mc["aud"], mc["aud"])
+	}
+	// Header must declare HS256 — confirms RegisteredClaims path is taken
+	if parsed.Method.Alg() != "HS256" {
+		t.Errorf("alg: expected HS256, got %s", parsed.Method.Alg())
+	}
+}
+
+// TestNewToken_UniqueJTI verifies uuid.New() produces a distinct JTI per call.
+func TestNewToken_UniqueJTI(t *testing.T) {
+	t.Setenv("RSSX_SECURITY_KEY", "test-rssx-security-key")
+
+	parser := jwt.NewParser()
+	getJTI := func(tok string) string {
+		parsed, _, _ := parser.ParseUnverified(tok, jwt.MapClaims{})
+		return parsed.Claims.(jwt.MapClaims)["jti"].(string)
+	}
+
+	jti1 := getJTI(NewToken("userA"))
+	jti2 := getJTI(NewToken("userB"))
+	jti3 := getJTI(NewToken("userA")) // same user, different call
+
+	if jti1 == jti2 || jti1 == jti3 || jti2 == jti3 {
+		t.Error("expected a unique JTI for every NewToken call")
+	}
+}
+
+// TestParseToken_ValidRoundtrip tests the NewToken → ParseToken roundtrip via the
+// business layer (zero coverage before this PR's test additions).
+func TestParseToken_ValidRoundtrip(t *testing.T) {
+	const key = "rssx-roundtrip-key"
+	t.Setenv("RSSX_SECURITY_KEY", key)
+
+	const userID = "roundtrip-user-123"
+	token := NewToken(userID)
+
+	payload, err := ParseToken(token)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if payload.Id != userID {
+		t.Errorf("Id: expected %s, got %s", userID, payload.Id)
+	}
+	if payload.Iss != "wiloon.com" {
+		t.Errorf("Iss: expected wiloon.com, got %s", payload.Iss)
+	}
+	if payload.Sub != "rssx" {
+		t.Errorf("Sub: expected rssx, got %s", payload.Sub)
+	}
+	if payload.Exp == 0 {
+		t.Error("Exp must be non-zero")
+	}
+	if payload.Iat == 0 {
+		t.Error("Iat must be non-zero")
+	}
+	if payload.Jti == "" {
+		t.Error("Jti must be set")
+	}
+}
+
+// TestParseToken_AudNotMappedToSub is a regression test for the PR fix.
+// Before the fix: jwtPayload.Sub = claims["aud"].(string)  — wrong field + potential panic.
+// After the fix:  Sub holds the "sub" claim, Aud holds the "aud" claim (safe assertion).
+func TestParseToken_AudNotMappedToSub(t *testing.T) {
+	const key = "aud-regression-key"
+	t.Setenv("RSSX_SECURITY_KEY", key)
+
+	payload, err := ParseToken(NewToken("aud-test-user"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Sub must contain "rssx" (the "sub" claim), not "rssx.wiloon.net" (the "aud" value).
+	if payload.Sub == "rssx.wiloon.net" {
+		t.Error("regression: aud value has been stored in Sub — PR bug fix has regressed")
+	}
+	if payload.Sub != "rssx" {
+		t.Errorf("Sub: expected rssx, got %s", payload.Sub)
+	}
+}
+
+// TestParseToken_BusinessLayer_Expired verifies the business-layer ParseToken
+// rejects expired tokens (error-first check added in the PR).
+func TestParseToken_BusinessLayer_Expired(t *testing.T) {
+	const key = "expired-test-key"
+	t.Setenv("RSSX_SECURITY_KEY", key)
+
+	expiredClaims := jwt.MapClaims{
+		"iss": "wiloon.com",
+		"sub": "rssx",
+		"exp": float64(time.Now().Add(-1 * time.Hour).Unix()),
+		"iat": float64(time.Now().Add(-2 * time.Hour).Unix()),
+		"jti": "expired-jti",
+		"id":  "some-user",
+	}
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, expiredClaims)
+	signed, _ := tok.SignedString([]byte(key))
+
+	_, err := ParseToken(signed)
+	if err == nil {
+		t.Fatal("expected error for expired token, got nil")
+	}
+}
+
+// TestParseToken_BusinessLayer_InvalidSignature verifies the business-layer ParseToken
+// rejects tokens signed with a different key.
+func TestParseToken_BusinessLayer_InvalidSignature(t *testing.T) {
+	const key = "correct-key"
+	t.Setenv("RSSX_SECURITY_KEY", key)
+
+	claims := jwt.MapClaims{
+		"iss": "wiloon.com",
+		"sub": "rssx",
+		"exp": float64(time.Now().Add(24 * time.Hour).Unix()),
+		"id":  "some-user",
+	}
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, _ := tok.SignedString([]byte("wrong-key"))
+
+	_, err := ParseToken(signed)
+	if err == nil {
+		t.Fatal("expected error for invalid signature, got nil")
+	}
+}
+
 // BenchmarkGenJwtToken benchmarks token generation performance.
 func BenchmarkGenJwtToken(b *testing.B) {
 	for i := 0; i < b.N; i++ {

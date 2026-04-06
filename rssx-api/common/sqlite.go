@@ -143,3 +143,16 @@ func init() {
 
 	zapLog.Info("database initialized successfully: %s", rssxDb)
 }
+
+// InitForTesting reinitializes the database with an in-memory SQLite instance.
+// Call this from TestMain to isolate tests from any on-disk database.
+func InitForTesting() {
+	var err error
+	DB, err = gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		panic("failed to init test db: " + err.Error())
+	}
+	if err = DB.AutoMigrate(&User{}, &Feed{}, &News{}, &UserFeed{}); err != nil {
+		panic("failed to migrate test db: " + err.Error())
+	}
+}

@@ -7,14 +7,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
-	"github.com/patrickmn/go-cache"
 	"rssx/utils"
 	"rssx/utils/config"
 	"rssx/utils/logger"
 	"rssx/utils/response"
+
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/patrickmn/go-cache"
 )
 
 var tokenRefreshCache *cache.Cache
@@ -96,7 +97,7 @@ func ParseToken(tokenString string) (jwtPayload *Payload, err error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return config.GetString("security-key", ""), nil
+		return []byte(config.GetString("rssx.security-key", "")), nil
 	})
 
 	if err != nil {
