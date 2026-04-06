@@ -27,6 +27,17 @@ func main() {
 	//定时清理缓存
 	go rss.Gc()
 
+	router := setupRouter()
+	err := router.Run(":8080")
+	if err != nil {
+		log.Errorf("failed to start rssx: %v", err)
+		os.Exit(1)
+	}
+	log.Info("rssx started and listening default port of gin")
+	utils.WaitSignals()
+}
+
+func setupRouter() *gin.Engine {
 	router := gin.Default()
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -46,12 +57,5 @@ func main() {
 	router.GET("/mark-read", list.MarkWholePageAsRead)
 	router.POST("/login", user.Login)
 	router.POST("/register", user.Register)
-
-	err := router.Run(":8080")
-	if err != nil {
-		log.Errorf("failed to start rssx: %v", err)
-		os.Exit(1)
-	}
-	log.Info("rssx started and listening default port of gin")
-	utils.WaitSignals()
+	return router
 }

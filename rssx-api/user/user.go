@@ -1,12 +1,13 @@
 package user
 
 import (
-	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 	"rssx/common"
 	"rssx/utils"
 	"rssx/utils/logger"
 	log "rssx/utils/logger"
+
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const DefaultId = "0"
@@ -49,6 +50,7 @@ func (u *User) Validate() bool {
 		err := bcrypt.CompareHashAndPassword([]byte(tmp.Password), []byte(u.Password))
 		if err == nil {
 			pass = true
+			u.Id = tmp.Id
 		}
 	}
 	return pass
