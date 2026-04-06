@@ -4,12 +4,13 @@ import (
 	"crypto/md5"
 	"crypto/sha256"
 	"fmt"
-	"github.com/google/uuid"
 	"os"
 	"rssx/utils"
 	"rssx/utils/config"
 	log "rssx/utils/logger"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 func Test00(t *testing.T) {
@@ -19,7 +20,7 @@ func TestUUID(t *testing.T) {
 	rootUUID, _ := uuid.FromString("5e4a8cfe-73df-4ca6-8089-18c189cc1aa3")
 
 	for i := 0; i < 10; i++ {
-		newsUUID := uuid.NewMD5(rootUUID, []byte("news_id"))
+		newsUUID := uuid.NewSHA1(rootUUID, []byte("news_id"))
 		fmt.Println(newsUUID)
 	}
 

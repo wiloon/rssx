@@ -2,6 +2,7 @@ package jwt
 
 import (
 	"encoding/base64"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -64,7 +65,7 @@ func createInvalidSignatureToken(id string) (string, error) {
 		Id: id,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Audience:  jwt.ClaimStrings{"rssx.wiloon.net"},
-			ExpiresAt:  jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			ID:        "test-jti",
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    "wiloon.com",
@@ -82,7 +83,7 @@ func createMalformedToken() string {
 	return "this.is.not.a.valid.jwt.token"
 }
 
-// createTokenWithWrongMethod creates a token using RS256 instead of HMAC.
+// createTokenWithWrongMethod creates a token using the "none" algorithm (not HMAC).
 func createTokenWithWrongMethod(id string) (string, error) {
 	claims := jwt.MapClaims{
 		"iss": "wiloon.com",
@@ -94,8 +95,8 @@ func createTokenWithWrongMethod(id string) (string, error) {
 		"jti": "test-jti",
 		"id":  id,
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
-	return token.SignedString(getSigningKey())
+	token := jwt.NewWithClaims(jwt.SigningMethodNone, claims)
+	return token.SignedString(jwt.UnsafeAllowNoneSignatureType)
 }
 
 // TestGenJwtToken tests basic JWT token generation and structure.
@@ -199,7 +200,7 @@ func TestParseToken_MalformedToken(t *testing.T) {
 	t.Logf("correctly rejected malformed token: %v", err)
 }
 
-// TestParseToken_WrongSigningMethod tests that tokens signed with unexpected methods are rejected.
+// TestParseToken_WrongSigningMethod tests that tokens signed with non-HMAC methods are rejected.
 func TestParseToken_WrongSigningMethod(t *testing.T) {
 	token, err := createTokenWithWrongMethod("user123")
 	if err != nil {
@@ -208,12 +209,14 @@ func TestParseToken_WrongSigningMethod(t *testing.T) {
 
 	_, err = jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, jwt.ErrSignatureInvalid
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
 		return getSigningKey(), nil
 	})
-	// The error could be signature invalid or unexpected method
-	t.Logf("rejected wrong signing method token: %v", err)
+	if err == nil {
+		t.Fatal("expected error for token with non-HMAC signing method, got nil")
+	}
+	t.Logf("correctly rejected non-HMAC signing method: %v", err)
 }
 
 // TestRssxClaims_Fields verifies all fields of RssxClaims are set correctly.
