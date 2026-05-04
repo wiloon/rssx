@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"rssx/common"
 	"rssx/feed/news/list"
 	"rssx/feeds"
 	"rssx/rss"
@@ -33,11 +34,12 @@ func main() {
 		})
 	})
 
-	router.GET("/feeds", feeds.LoadFeedList)
-	router.POST("/feeds", feeds.AddFeed)
-	router.DELETE("/feeds/:id", feeds.DeleteFeed)
-	router.POST("/sync", rss.SyncAll)
-	router.POST("/sync/:id", rss.SyncOne)
+	feedHandler := feeds.NewHandler(feeds.NewGormFeedRepository(common.DB))
+	router.GET("/feeds", feedHandler.LoadFeedList)
+	router.POST("/feed", feedHandler.AddFeed)
+	router.DELETE("/feed/:id", feedHandler.RemoveFeed)
+    router.POST("/sync", rss.SyncAll)
+    router.POST("/sync/:id", rss.SyncOne)
 	router.GET("/news-list", list.LoadNewsList)
 	router.GET("/news", list.LoadArticles)
 	router.GET("/previous-news", list.PreviousArticle)
