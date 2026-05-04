@@ -33,3 +33,18 @@ tasks:
     dir: rssx-ui
     cmds:
       - fnm exec --using=18 pnpm serve
+
+  deploy:api:
+    desc: 触发 Tekton Pipeline 构建并部署 rssx-api
+    cmds:
+      - kubectl create -f ~/workspace/w10n-config/homelab/k8s/tekton/pipelinerun-rssx-api.yaml
+
+  deploy:api:logs:
+    desc: 查看最新一次 rssx-api 构建日志
+    cmds:
+      - tkn pipelinerun logs -n tekton-pipelines -f --last
+
+  deploy:ui:
+    desc: 触发 Tekton Pipeline 构建并部署 rssx-ui
+    cmds:
+      - kubectl create -f ~/workspace/w10n-config/homelab/k8s/tekton/pipelinerun-rssx-ui.yaml

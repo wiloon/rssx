@@ -13,6 +13,49 @@
 
 No exceptions. This applies to all AI-generated and human-written content.
 
+## Development Philosophy
+
+### AI Harness Engineering
+
+This project follows **AI Harness Engineering** — a collaboration model where humans define constraints and AI fills in implementation within those boundaries.
+
+The harness consists of three layers:
+
+1. **Task spec** (`rssx-api/docs/tasks/task-NNN-*.md`) — defines behavior, endpoints, validation rules, and error responses before any code is written
+2. **Interface / type definitions** — Go interfaces (e.g. `FeedRepository`) that constrain the shape of AI-generated implementations
+3. **Tests** — unit tests written alongside or before implementation to verify AI output
+
+Workflow for each task:
+```
+Write task spec → Define interfaces → AI implements → Tests verify
+```
+
+### Domain-Driven Design (DDD)
+
+The `rssx-api` backend follows DDD layering principles:
+
+```
+rssx-api/
+├── <domain>/          # Domain entities and Repository interfaces
+│   └── repository.go  # Interface definition (no DB dependency)
+├── <domain>/          # GORM implementations of interfaces
+│   └── gorm_repository.go
+├── <domain>/          # HTTP handlers — depend on interfaces, not GORM directly
+│   └── feeds.go       # Handler struct with injected FeedRepository
+└── common/            # Shared DB init (gorm.DB passed in at startup)
+```
+
+**Rules:**
+- **Handlers** only deal with HTTP (parse request, call repository, return response)
+- **Repository interfaces** live in the same package as the handlers; GORM implementations are separate
+- **Handlers receive dependencies via constructor** (`NewHandler(repo FeedRepository)`)
+- **Unit tests use mock repositories** — no real database required
+- **Integration build tag** (`//go:build integration`) for tests that need a real DB
+
+**Current state:** `feeds` package follows DDD. Other packages (`news`, `rss`, `user`) use the older flat style and will be migrated incrementally.
+
+---
+
 ## Project Overview
 
 RSSX is a modern RSS reader application consisting of:
