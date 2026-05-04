@@ -2,10 +2,9 @@ package main
 
 import (
 	"fmt"
-	"rssx/utils"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func main() {
@@ -13,14 +12,14 @@ func main() {
 
 	type MyCustomClaims struct {
 		Foo string `json:"foo"`
-		jwt.StandardClaims
+		jwt.RegisteredClaims
 	}
 
 	// Create the Claims
 	claims := MyCustomClaims{
-		"bar",
-		jwt.StandardClaims{
-			ExpiresAt: utils.DateToSeconds(time.Now().AddDate(0, 0, 1)),
+		Foo: "bar",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().AddDate(0, 0, 1)),
 			Issuer:    "test",
 		},
 	}

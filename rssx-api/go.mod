@@ -6,12 +6,12 @@ require (
 	github.com/garyburd/redigo v1.6.0
 	github.com/gin-gonic/gin v1.7.3
 	github.com/glebarez/sqlite v1.11.0
-	github.com/golang-jwt/jwt v3.2.2+incompatible
+	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.4.0
 	github.com/panjf2000/ants/v2 v2.4.8
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pelletier/go-toml v1.8.1
-	github.com/satori/go.uuid v1.2.0
 	go.uber.org/zap v1.16.0
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -27,7 +27,6 @@ require (
 	github.com/go-playground/validator/v10 v10.9.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/json-iterator/go v1.1.11 // indirect
