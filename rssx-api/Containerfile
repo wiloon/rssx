@@ -1,12 +1,9 @@
 # ==========================================
 # Build stage
 # ==========================================
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25 AS builder
 
 LABEL maintainer="wiloon <wiloon.wy@gmail.com>"
-
-# Install build dependencies
-RUN apk add --no-cache git ca-certificates tzdata
 
 # Set working directory
 WORKDIR /build
