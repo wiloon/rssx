@@ -6,7 +6,7 @@ import (
 	"syscall"
 )
 
-var signals = make(chan os.Signal)
+var signals = make(chan os.Signal, 1)
 
 func init() {
 	signal.Notify(signals, os.Interrupt, os.Kill, syscall.SIGTERM)
