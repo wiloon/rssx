@@ -20,6 +20,14 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
+          env:
+            # 集群内直连 Redis Service（database 命名空间，无密码）
+            - name: REDIS_ADDRESS
+              value: "redis.database.svc.cluster.local:6379"
+            - name: REDIS_PASSWORD
+              value: ""
+            - name: LOG_LEVEL
+              value: "info"
           volumeMounts:
             - name: data
               mountPath: /var/lib

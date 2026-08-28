@@ -15,7 +15,11 @@ import (
 )
 
 func main() {
-	log.Init("CONSOLE", "debug", "rssx-api")
+	log.Init("CONSOLE", config.GetString("log.level", "info"), "rssx-api")
+
+	if mode := config.GetString("gin.mode", gin.ReleaseMode); mode != "" {
+		gin.SetMode(mode)
+	}
 
 	//定时同步文章列表， rss源>redis
 	syncAuto := config.GetBoolWithDefaultValue("rssx.rss-sync-auto", false)
@@ -49,8 +53,8 @@ func setupRouter() *gin.Engine {
 	router.GET("/feeds", feedHandler.LoadFeedList)
 	router.POST("/feed", feedHandler.AddFeed)
 	router.DELETE("/feed/:id", feedHandler.RemoveFeed)
-    router.POST("/sync", rss.SyncAll)
-    router.POST("/sync/:id", rss.SyncOne)
+	router.POST("/sync", rss.SyncAll)
+	router.POST("/sync/:id", rss.SyncOne)
 	router.GET("/news-list", list.LoadNewsList)
 	router.GET("/news", list.LoadArticles)
 	router.GET("/previous-news", list.PreviousArticle)

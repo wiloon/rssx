@@ -40,17 +40,15 @@ func (h *Handler) LoadFeedList(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
 		return
 	}
-	log.Info("user feeds: %+v", userFeeds)
+	feedIds := make([]int, len(userFeeds))
+	for i, v := range userFeeds {
+		feedIds[i] = int(v.Id)
+	}
+	unreadCounts := list.FeedUnreadCounts(user.DefaultId, feedIds)
+
 	for _, v := range userFeeds {
-		log.Debugf("feed: %+v", v)
-		count := list.Count(int(v.Id))
-		index := list.GetLatestReadIndex(user.DefaultId, int(v.Id))
-		unread := count - index - 1
-		if unread < 0 {
-			unread = 0
-		}
+		unread := unreadCounts[int(v.Id)]
 		v.Title = v.Title + " - " + strconv.Itoa(int(unread))
-		log.Debugf("feed list item: %v", v)
 		feedsList = append(feedsList, v)
 	}
 	c.JSON(http.StatusOK, feedsList)

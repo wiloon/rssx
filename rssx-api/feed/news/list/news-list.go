@@ -1,13 +1,16 @@
 package list
 
 import (
+	"strconv"
+
 	"github.com/gin-gonic/gin"
+	"github.com/gomodule/redigo/redis"
+
 	"rssx/feed"
 	"rssx/news"
 	"rssx/storage/redisx"
 	"rssx/user"
 	log "rssx/utils/logger"
-	"strconv"
 )
 
 const FeedNewsKeyPrefix string = "feed_news:"
@@ -29,7 +32,7 @@ func NewList(userId int, feed feed.Feed) *NewsList {
 // score : 当前时间戳
 func (newsList *NewsList) AppendNews(score int64, newsId string) {
 	feedNewsKey := FeedNewsKeyPrefix + strconv.Itoa(int(newsList.feed.Id))
-	_, _ = redisx.GetConn().Do("ZADD", feedNewsKey, score, newsId)
+	_, _ = redisx.Exec("ZADD", feedNewsKey, score, newsId)
 }
 
 // FindNewsListByUserFeed 按用户和feed取一页未读文章
@@ -41,7 +44,7 @@ func FindNewsListByUserFeed(userId string, feedId int) []string {
 	unReadIndexStart := latestReadIndex + 1
 	unReadIndexEnd := unReadIndexStart + PageSize - 1
 	newsList = FindNewsListByRange(key, unReadIndexStart, unReadIndexEnd)
-	log.Infof("find news list by feed, index start: %v, index enc: %v, list size: %v", unReadIndexStart, unReadIndexEnd, len(newsList))
+	log.Debugf("find news list by feed, index start: %v, index end: %v, list size: %v", unReadIndexStart, unReadIndexEnd, len(newsList))
 	return newsList
 }
 
@@ -54,14 +57,14 @@ func FindNewsListByRange(key string, start, end int64) []string {
 	log.Debugf("find news list by rang, start: %v, end: %v", start, end)
 	var newsIdList []string
 
-	result, err := redisx.GetConn().Do("ZRANGE", key, start, end)
+	result, err := redisx.Exec("ZRANGE", key, start, end)
 	if err != nil {
-		log.Info("failed to get news")
+		log.Errorf("failed to get news list by range, key: %v, err: %v", key, err)
+		return newsIdList
 	}
 	for _, v := range result.([]interface{}) {
 		b := v.([]byte)
 		newsId := string(b)
-		log.Info("news id: " + newsId)
 		newsIdList = append(newsIdList, newsId)
 	}
 	log.Debugf("find news list by rang, start: %v, end: %v, list size: %v", start, end, len(newsIdList))
@@ -82,7 +85,7 @@ func FindNextId(feedId int, newsId string) string {
 	var nextNewsId string
 	index := FindIndexById(feedId, newsId)
 	nextIndex := index + 1
-	foo, _ := redisx.GetConn().Do("ZRANGE", feedNewsKey(feedId), nextIndex, nextIndex)
+	foo, _ := redisx.Exec("ZRANGE", feedNewsKey(feedId), nextIndex, nextIndex)
 	if len(foo.([]interface{})) > 0 {
 		nextNewsId = string(foo.([]interface{})[0].([]byte))
 
@@ -107,33 +110,111 @@ const userFeedLatestReadIndex string = "read_index:"
 // 按score取index
 // redis里保存 score, 取最新的未读索引时时先取score再用score取member,再用member取位置   -_-!!
 func GetLatestReadIndex(userId string, feedId int) int64 {
-	log.Debugf("get latest read index, user id: %v, feed id: %v", userId, feedId)
-	score := 0
 	latestReadIndexKey := userFeedLatestReadIndex + userId + ":" + strconv.Itoa(feedId)
-	r, err := redisx.GetConn().Do("GET", latestReadIndexKey)
+	r, err := redisx.Exec("GET", latestReadIndexKey)
 	if err != nil {
-		log.Info(err.Error())
+		log.Errorf("get latest read index failed, key: %v, err: %v", latestReadIndexKey, err)
+		return -1
 	}
-	var rank int64
-	if r != nil {
-		b := r.([]byte)
-		i := string(b)
-		score, _ = strconv.Atoi(i) // score
-		feedNewsKey := FeedNewsKeyPrefix + strconv.Itoa(feedId)
-		rank = redisx.GetRankByScore(feedNewsKey, int64(score))
-	} else {
-		// 取不到score时
-		rank = -1
+	if r == nil {
+		// 没有已读标记时
+		return -1
 	}
-
+	score, _ := strconv.Atoi(string(r.([]byte)))
+	rank := redisx.GetRankByScore(NewsListKey(feedId), int64(score))
 	log.Debugf("get latest read index, key: %v, score: %v, rank: %v", latestReadIndexKey, score, rank)
 	return rank
+}
+
+// FeedUnreadCounts 批量计算多个 feed 的未读数量。
+// 用两次 pipeline 往返完成，替代原来每个 feed 最多 4 次的串行往返。
+func FeedUnreadCounts(userId string, feedIds []int) map[int]int64 {
+	counts := make(map[int]int64, len(feedIds))
+	if len(feedIds) == 0 {
+		return counts
+	}
+
+	n := len(feedIds)
+	totals := make([]int64, n)
+	scores := make([]int64, n)
+	haveScore := make([]bool, n)
+	ranks := make([]int64, n)
+	for i := range ranks {
+		ranks[i] = -1 // 没有已读标记
+	}
+
+	// 第一轮：每个 feed 的 ZCARD + GET(已读标记 score)
+	err := redisx.WithConn(func(conn redis.Conn) error {
+		for _, fid := range feedIds {
+			_ = conn.Send("ZCARD", NewsListKey(fid))
+			_ = conn.Send("GET", userFeedLatestReadIndex+userId+":"+strconv.Itoa(fid))
+		}
+		if err := conn.Flush(); err != nil {
+			return err
+		}
+		for i := range feedIds {
+			totals[i], _ = redis.Int64(conn.Receive())
+			raw, err := redis.Bytes(conn.Receive())
+			if err == nil && len(raw) > 0 {
+				if s, convErr := strconv.ParseInt(string(raw), 10, 64); convErr == nil {
+					scores[i] = s
+					haveScore[i] = true
+					if s == 0 {
+						ranks[i] = 0
+					}
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		log.Errorf("feed unread counts, round 1 failed: %v", err)
+		return counts
+	}
+
+	// 第二轮：对有 score 的 feed，用 ZCOUNT 取已读位置之前的数量
+	err = redisx.WithConn(func(conn redis.Conn) error {
+		sent := false
+		for i, fid := range feedIds {
+			if !haveScore[i] || scores[i] == 0 {
+				continue
+			}
+			_ = conn.Send("ZCOUNT", NewsListKey(fid), "-inf", "("+strconv.FormatInt(scores[i], 10))
+			sent = true
+		}
+		if !sent {
+			return nil
+		}
+		if err := conn.Flush(); err != nil {
+			return err
+		}
+		for i := range feedIds {
+			if !haveScore[i] || scores[i] == 0 {
+				continue
+			}
+			ranks[i], _ = redis.Int64(conn.Receive())
+		}
+		return nil
+	})
+	if err != nil {
+		log.Errorf("feed unread counts, round 2 failed: %v", err)
+		return counts
+	}
+
+	for i, fid := range feedIds {
+		unread := totals[i] - ranks[i] - 1
+		if unread < 0 {
+			unread = 0
+		}
+		counts[fid] = unread
+	}
+	return counts
 }
 
 // SetReadIndex 更新已读索引
 // 存score值
 func SetReadIndex(userId, feedId int, index int64) {
-	log.Info("set read index, user id: %v, feed id: %v, index: %v", userId, feedId, index)
+	log.Debugf("set read index, user id: %v, feed id: %v, index: %v", userId, feedId, index)
 	// get score by rank
 	feedNewsKey := FeedNewsKeyPrefix + strconv.Itoa(feedId)
 	userFeedReadIndexKey := userFeedLatestReadIndex + strconv.Itoa(userId) + ":" + strconv.Itoa(feedId)
@@ -143,14 +224,14 @@ func SetReadIndex(userId, feedId int, index int64) {
 		log.Warn("invalid score, ignore")
 		return
 	}
-	_, _ = redisx.GetConn().Do("SET", userFeedReadIndexKey, score)
+	_, _ = redisx.Exec("SET", userFeedReadIndexKey, score)
 	log.Debugf("set read index, score:%v", score)
 }
 
 // FindIndexById 按 article id 取索引
 func FindIndexById(feedId int, newsId string) int64 {
 	var index int64
-	result, err := redisx.GetConn().Do("ZRANK", feedNewsKey(feedId), newsId)
+	result, err := redisx.Exec("ZRANK", feedNewsKey(feedId), newsId)
 	if err != nil {
 		log.Info(err.Error())
 	}
@@ -165,7 +246,7 @@ func FindIndexById(feedId int, newsId string) int64 {
 
 func Count(feedId int) int64 {
 	var count int64
-	result, err := redisx.GetConn().Do("ZCARD", feedNewsKey(feedId))
+	result, err := redisx.Exec("ZCARD", feedNewsKey(feedId))
 	if err != nil {
 		log.Info(err.Error())
 	}
@@ -187,16 +268,7 @@ func LoadNewsListByFeed(feedId int) []news.News {
 	} else {
 		// by feed id
 		newsIds := FindNewsListByUserFeed(user.DefaultId, feedId)
-		for _, v := range newsIds {
-			n := news.New(v)
-			n.FeedId = int64(feedId)
-			n.LoadTitle()
-			n.LoadReadFlag()
-			// calculate unread count
-
-			newsList = append(newsList, *n)
-			log.Debugf("append article: %v", n.Title)
-		}
+		newsList = news.LoadListForFeed(int64(feedId), user.DefaultId, newsIds)
 	}
 	log.Debugf("new list size: %v", len(newsList))
 	return newsList
