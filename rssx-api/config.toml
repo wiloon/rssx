@@ -3,6 +3,8 @@ rss-sync-auto=true
 security-key="fa6ee430-ebf6-44f2-a18b-64d691cd2dae"
 
 [redis]
+# 本地开发用的地址。集群内部署时用 REDIS_ADDRESS 环境变量覆盖为
+# k8s Service 域名，例如 redis.<namespace>.svc.cluster.local:6379
 address="redis.wiloon.com:32379"
 
 [sync]
@@ -14,6 +16,6 @@ expire-time="-720h"
 gc-duration="24h"
 
 [log]
-level="debug"
+level="info"
 path="/data/rssx/logs/"
 file-name="rssx.log"

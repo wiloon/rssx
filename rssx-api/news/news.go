@@ -1,7 +1,7 @@
 package news
 
 import (
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 	"rssx/storage/redisx"
 	"rssx/user"
 	log "rssx/utils/logger"
@@ -111,4 +111,48 @@ func (n *News) Load() {
 
 func DelReadMark(userId, feedId int) {
 	_, _ = redisx.Exec("DEL", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(feedId)))
+}
+
+// LoadListForFeed loads titles and read flags for a page of news in one feed
+// using two pipelined Redis round trips total, instead of two per item.
+func LoadListForFeed(feedId int64, userId string, ids []string) []News {
+	result := make([]News, 0, len(ids))
+	if len(ids) == 0 {
+		return result
+	}
+
+	titles := make([]string, len(ids))
+	readFlags := make([]bool, len(ids))
+	readMarkKey := newsReadMark + userId + ":" + strconv.Itoa(int(feedId))
+
+	err := redisx.WithConn(func(conn redis.Conn) error {
+		for _, id := range ids {
+			_ = conn.Send("HGET", newsKeyPrefix+id, Title)
+			_ = conn.Send("SISMEMBER", readMarkKey, id)
+		}
+		if err := conn.Flush(); err != nil {
+			return err
+		}
+		for i := range ids {
+			title, _ := redis.String(conn.Receive())
+			titles[i] = title
+			isRead, _ := redis.Bool(conn.Receive())
+			readFlags[i] = isRead
+		}
+		return nil
+	})
+	if err != nil {
+		log.Errorf("load news list for feed failed, feed id: %v, err: %v", feedId, err)
+		return result
+	}
+
+	for i, id := range ids {
+		result = append(result, News{
+			Id:       id,
+			FeedId:   feedId,
+			Title:    titles[i],
+			ReadFlag: readFlags[i],
+		})
+	}
+	return result
 }

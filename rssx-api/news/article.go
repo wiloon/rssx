@@ -31,7 +31,7 @@ func (article *DefaultArticle) IsExistInStorage() bool {
 	feedId := int(article.FeedId)
 	articleId := article.Id
 	var index int64
-	result, err := redisx.GetConn().Do("ZRANK", feedNewsKey(feedId), articleId)
+	result, err := redisx.Exec("ZRANK", feedNewsKey(feedId), articleId)
 	log.Debugf("is exist in storage, feed id: %v, article id: %v, result: %v", feedId, articleId, result)
 	if err != nil {
 		log.Info(err.Error())
