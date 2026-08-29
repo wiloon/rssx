@@ -9,7 +9,8 @@ WORKDIR /build
 RUN npm install -g pnpm
 
 # Copy package files (leverage layer cache)
-COPY package.json pnpm-lock.yaml ./
+# pnpm-workspace.yaml carries the allowBuilds decisions required by pnpm 10+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
