@@ -1,25 +1,21 @@
-import Vue from 'vue'
-import Vuetify from 'vuetify/lib'
+import 'vuetify/styles'
+import '@mdi/font/css/materialdesignicons.css'
+import { createVuetify } from 'vuetify'
 
-Vue.use(Vuetify)
-
-export default new Vuetify({
-  icons: {
-    iconfont: 'mdiSvg' // 'mdi' || 'mdiSvg' || 'md' || 'fa' || 'fa4' || 'faSvg'
-  },
+export default createVuetify({
   theme: {
-    options: {
-      customProperties: true
-    },
+    defaultTheme: 'light',
     themes: {
       light: {
-        primary: '#1976D2',
-        secondary: '#424242',
-        accent: '#82B1FF',
-        error: '#FF5252',
-        info: '#2196F3',
-        success: '#4CAF50',
-        warning: '#FFC107'
+        colors: {
+          primary: '#1976D2',
+          secondary: '#424242',
+          accent: '#82B1FF',
+          error: '#FF5252',
+          info: '#2196F3',
+          success: '#4CAF50',
+          warning: '#FFC107'
+        }
       }
     }
   }

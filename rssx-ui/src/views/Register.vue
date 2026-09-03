@@ -1,86 +1,54 @@
-<template>
-  <div>
-    <v-text-field
-      data-cy="user-name"
-      v-model="name"
-      label="用户名">
-    </v-text-field>
-    <v-text-field
-      data-cy="password"
-      v-model="password"
-      label="密码"
-      type="password"
-      counter>
-    </v-text-field>
-    <v-text-field
-      data-cy="password"
-      v-model="passwordCheck"
-      label="密码确认"
-      type="password"
-      counter>
-    </v-text-field>
-    <v-btn
-      block
-      color="primary"
-      @click="login"
-      data-cy="login"
-      style="margin-right: 10px"
-    >登录
-    </v-btn>
-    <v-snackbar
-      v-model="snackbar" timeout="3000"
-    >
-      {{ msg }}
-      <template v-slot:action="{ attrs }">
-        <v-btn
-          color="pink"
-          text
-          v-bind="attrs"
-          @click="snackbar = false"
-        >
-          Close
-        </v-btn>
-      </template>
-    </v-snackbar>
-  </div>
-</template>
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { axiosInstance } from '@/api/http'
+import { setJwtToken } from '@/utils/auth'
 
-<script lang="ts">
-import { Component, Vue } from 'vue-property-decorator'
-import Axios from 'axios'
+const router = useRouter()
+const name = ref('')
+const password = ref('')
+const passwordCheck = ref('')
+const snackbar = ref(false)
+const msg = ref('')
 
-@Component({
-  components: {}
-})
-export default class Login extends Vue {
-  name = ''
-  password = ''
-  passwordCheck = ''
-  snackbar = false
-  msg = ''
-
-  login (event: any): void {
-    console.log('register')
-    Axios.post('/register', {
-      name: this.name,
-      password: this.password
-    }).then((response: any) => {
-      console.log('response.status: ' + response.status)
-      console.log('foo: ' + response.data.code)
-      if (response.data.code !== 20000) {
-        this.snackbar = true
-        this.msg = response.data.message
-        return
-      }
-      console.log('foo: ' + response.data.data.token)
-      const token = response.data.data.token
-      localStorage.setItem('token', token)
-      this.$router.push({ name: 'FeedList' })
-    })
+async function register (): Promise<void> {
+  if (password.value !== passwordCheck.value) {
+    msg.value = '两次输入的密码不一致'
+    snackbar.value = true
+    return
   }
-
-  mounted () {
-    console.log('login mounted')
+  const { data } = await axiosInstance.post('/register', {
+    name: name.value,
+    password: password.value
+  })
+  if (data.code !== 20000) {
+    msg.value = data.message
+    snackbar.value = true
+    return
   }
+  setJwtToken(data.data.token)
+  router.push({ name: 'Reader' })
 }
 </script>
+
+<template>
+  <v-container class="mx-auto" style="max-width: 400px">
+    <v-text-field v-model="name" data-cy="user-name" label="用户名" />
+    <v-text-field
+      v-model="password"
+      data-cy="password"
+      label="密码"
+      type="password"
+    />
+    <v-text-field
+      v-model="passwordCheck"
+      data-cy="password-check"
+      label="密码确认"
+      type="password"
+    />
+    <v-btn block color="primary" data-cy="register" @click="register">
+      注册
+    </v-btn>
+    <v-snackbar v-model="snackbar" :timeout="3000">{{ msg }}</v-snackbar>
+  </v-container>
+</template>

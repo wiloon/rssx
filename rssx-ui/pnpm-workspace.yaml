@@ -1,15 +1,8 @@
-# pnpm 10+ requires an explicit decision for every dependency that ships a
-# build (postinstall) script; an unresolved entry makes `pnpm install` fail
-# with ERR_PNPM_IGNORED_BUILDS. None of these need to run for the production
-# build (`vue-cli-service build`), so all are disabled.
-#   - core-js  : only prints a funding banner
-#   - cypress  : downloads the e2e test runner binary (not used in the image build)
-#   - deasync  : native addon used by vue-cli's dev-server IPC, not by `build`
-#   - ejs      : prints a funding banner
-#   - yorkie   : installs git hooks
-allowBuilds:
-  core-js: false
-  cypress: false
-  deasync: false
-  ejs: false
-  yorkie: false
+# pnpm 10+ requires an explicit build-script decision for every dependency that
+# ships a postinstall; an unresolved one fails `pnpm install` with
+# ERR_PNPM_IGNORED_BUILDS. The Vite + Vitest toolchain needs exactly two:
+#   - esbuild  : unpacks its platform binary
+#   - vue-demi : picks the Vue 2/3 shim at install time
+onlyBuiltDependencies:
+  - esbuild
+  - vue-demi
