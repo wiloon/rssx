@@ -36,4 +36,37 @@ describe('FeedColumn — the left pane', () => {
     const selected = wrapper.get('[data-test="feed"].is-selected')
     expect(selected.text()).toContain('InfoQ')
   })
+
+  it('shows a per-feed sync button on every real feed but not on the All row', () => {
+    const wrapper = mount(FeedColumn, { props: { feeds, selectedFeedId: null } })
+
+    const buttons = wrapper
+      .findAll('[data-test="feed"]')
+      .map((i) => i.find('[data-test="feed-sync"]').exists())
+    expect(buttons).toEqual([false, true, true])
+  })
+
+  it('emits sync with the feed id, without also selecting the feed', async () => {
+    const wrapper = mount(FeedColumn, { props: { feeds, selectedFeedId: null } })
+
+    await wrapper
+      .findAll('[data-test="feed"]')[1]
+      .get('[data-test="feed-sync"]')
+      .trigger('click')
+
+    expect(wrapper.emitted('sync')).toEqual([[3]])
+    expect(wrapper.emitted('select')).toBeUndefined()
+  })
+
+  it('spins and disables the sync button for the feed currently syncing', () => {
+    const wrapper = mount(FeedColumn, {
+      props: { feeds, selectedFeedId: null, syncingFeedId: 3 }
+    })
+
+    const button = wrapper
+      .findAll('[data-test="feed"]')[1]
+      .get('[data-test="feed-sync"]')
+    expect(button.classes()).toContain('is-syncing')
+    expect(button.attributes('disabled')).toBeDefined()
+  })
 })

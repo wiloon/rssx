@@ -102,6 +102,19 @@ export function createReaderStore (
       state.list = createArticleList()
     },
 
+    /**
+     * Trigger a one-off sync of one feed, then refresh the left column (and the
+     * open window, if it is the feed being synced). The backend sync runs
+     * asynchronously, so fresh articles may only show up on a later refresh.
+     */
+    async syncFeed (feedId: number): Promise<void> {
+      await api.syncOne(feedId)
+      await loadFeeds()
+      if (state.selectedFeedId === feedId) {
+        state.list = loadWindow(state.list, await api.listUnread(feedId))
+      }
+    },
+
     /** Subscribe to a new feed, then refresh the left column. */
     async addFeed (url: string, title: string): Promise<void> {
       await api.addFeed(url, title)
