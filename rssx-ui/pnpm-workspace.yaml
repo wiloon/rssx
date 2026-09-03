@@ -1,8 +1,12 @@
-# pnpm 10+ requires an explicit build-script decision for every dependency that
-# ships a postinstall; an unresolved one fails `pnpm install` with
-# ERR_PNPM_IGNORED_BUILDS. The Vite + Vitest toolchain needs exactly two:
+# pnpm requires an explicit build-script decision for every dependency that
+# ships a postinstall; otherwise `pnpm install` fails with ERR_PNPM_IGNORED_BUILDS.
+# The Vite + Vitest toolchain needs exactly two:
 #   - esbuild  : unpacks its platform binary
-#   - vue-demi : picks the Vue 2/3 shim at install time
+#   - vue-demi : selects the Vue 2/3 shim at install time
+# allowBuilds (map) is the pnpm 11 form; onlyBuiltDependencies (list) is pnpm 10.
+allowBuilds:
+  esbuild: true
+  vue-demi: true
 onlyBuiltDependencies:
   - esbuild
   - vue-demi
