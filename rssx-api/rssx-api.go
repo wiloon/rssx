@@ -51,8 +51,11 @@ func setupRouter() *gin.Engine {
 
 	feedHandler := feeds.NewHandler(feeds.NewGormFeedRepository(common.DB))
 	router.GET("/feeds", feedHandler.LoadFeedList)
+	router.GET("/feeds/detail", feedHandler.ListFeeds)
 	router.POST("/feed", feedHandler.AddFeed)
+	router.PUT("/feed/:id", feedHandler.UpdateFeed)
 	router.DELETE("/feed/:id", feedHandler.RemoveFeed)
+	router.DELETE("/feed/:id/purge", feedHandler.PurgeFeed)
 	router.POST("/sync", rss.SyncAll)
 	router.POST("/sync/:id", rss.SyncOne)
 	router.GET("/news-list", list.LoadNewsList)

@@ -3,6 +3,11 @@ import { getJwtToken } from '@/utils/auth'
 
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'Reader', component: () => import('@/views/Reader.vue') },
+  {
+    path: '/feeds',
+    name: 'FeedManager',
+    component: () => import('@/views/FeedManager.vue')
+  },
   { path: '/login', name: 'Login', component: () => import('@/views/Login.vue') },
   {
     path: '/register',

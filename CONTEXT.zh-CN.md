@@ -17,6 +17,12 @@ _避免_：channel、source、site、频道、站点
 Subscription，而不是 Feed。
 _避免_：follow、watch、关注
 
+**Purge（彻底删除）**：
+把一个 Feed 整体删除——它的记录行、指向它的所有 Subscription，以及它在 Redis 里的全部
+Article 和已读状态。与"移除 Subscription"不同，后者保留 Feed 本身。对应
+`DELETE /feed/:id/purge` 和订阅源管理页的删除操作。
+_避免_：只说 "delete / 删除" 而不说清删的是哪一个
+
 **Article（文章）**：
 从某个 Feed 抓取到的一条内容：标题、发布时间、原文 URL，以及 Feed 提供的正文（往往只有摘要）。
 用每个 Feed 内部的 id 标识。

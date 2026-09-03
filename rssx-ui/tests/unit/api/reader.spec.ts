@@ -1,6 +1,6 @@
 import { createReaderApi, HttpClient } from '@/api/reader'
 
-type Method = 'get' | 'post' | 'delete'
+type Method = 'get' | 'post' | 'put' | 'delete'
 
 interface Call {
   method: Method
@@ -29,6 +29,7 @@ function fakeHttp (routes: Record<string, unknown>): RecordingHttp {
     calls,
     get: (url, config) => respond({ method: 'get', url, config }),
     post: (url, data, config) => respond({ method: 'post', url, data, config }),
+    put: (url, data, config) => respond({ method: 'put', url, data, config }),
     delete: (url, config) => respond({ method: 'delete', url, config })
   }
 }

@@ -12,5 +12,6 @@ export const axiosInstance = axios.create({ baseURL: '/api' })
 export const http: HttpClient = {
   get: (url, config) => axiosInstance.get(url, config as object),
   post: (url, data, config) => axiosInstance.post(url, data, config as object),
+  put: (url, data, config) => axiosInstance.put(url, data, config as object),
   delete: (url, config) => axiosInstance.delete(url, config as object)
 }

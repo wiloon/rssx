@@ -52,6 +52,27 @@ func NewsListKey(feedId int) string {
 	return FeedNewsKeyPrefix + strconv.Itoa(feedId)
 }
 
+// PurgeFeed removes every trace of one feed from Redis: its article hashes, its
+// article index, and the read marks / read boundary of the given subscribers.
+// Used when a feed is deleted outright (not merely unsubscribed).
+func PurgeFeed(feedId int, subscriberIds []string) {
+	feedNewsKey := NewsListKey(feedId)
+	for _, newsId := range FindNewsListByRange(feedNewsKey, 0, -1) {
+		redisx.DeleteNews(newsId)
+	}
+	if _, err := redisx.Exec("DEL", feedNewsKey); err != nil {
+		log.Errorf("purge feed, failed to drop index %v: %v", feedNewsKey, err)
+	}
+	for _, uid := range subscriberIds {
+		if userId, err := strconv.Atoi(uid); err == nil {
+			news.DelReadMark(userId, feedId)
+		}
+		if _, err := redisx.Exec("DEL", userFeedLatestReadIndex+uid+":"+strconv.Itoa(feedId)); err != nil {
+			log.Errorf("purge feed, failed to drop read index for user %v: %v", uid, err)
+		}
+	}
+}
+
 // FindNewsListByRange 按索引取文章列表
 func FindNewsListByRange(key string, start, end int64) []string {
 	log.Debugf("find news list by rang, start: %v, end: %v", start, end)
