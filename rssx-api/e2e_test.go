@@ -6,26 +6,93 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
 	"rssx/common"
+	"rssx/feed"
+	"rssx/feed/news/list"
+	"rssx/news"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 // testSecurityKey is the JWT signing key used across all e2e tests.
 const testSecurityKey = "e2e-test-security-key-rssx"
 
+// miniRedis backs redisx for the whole e2e run; resetState() flushes it per test.
+var miniRedis *miniredis.Miniredis
+
 func TestMain(m *testing.M) {
 	// Set security key so JWT signing/parsing uses a known key during tests.
 	os.Setenv("SECURITY_KEY", testSecurityKey)
+
+	// Point redisx at an in-memory Redis. REDIS_ADDRESS must be set before the
+	// first redisx call, since the connection pool initialises lazily once.
+	mr, err := miniredis.Run()
+	if err != nil {
+		panic("failed to start miniredis: " + err.Error())
+	}
+	miniRedis = mr
+	os.Setenv("REDIS_ADDRESS", mr.Addr())
 
 	// Replace the DB initialized by init() with an in-memory instance so tests
 	// are fully isolated from any on-disk database.
 	common.InitForTesting()
 
-	os.Exit(m.Run())
+	code := m.Run()
+	mr.Close()
+	os.Exit(code)
+}
+
+// resetState gives a test a clean SQLite DB and a clean Redis.
+func resetState(t *testing.T) {
+	t.Helper()
+	common.InitForTesting()
+	miniRedis.FlushAll()
+}
+
+// seedArticle stores an article in Redis and adds it to a feed's news index,
+// exactly as the RSS sync path does.
+func seedArticle(feedID int64, id, title string, score int64) {
+	n := news.News{
+		Id:          id,
+		FeedId:      feedID,
+		Title:       title,
+		Url:         "https://example.com/" + id,
+		Description: "<p>body " + id + "</p>",
+		PubDate:     "2026-01-01",
+		Guid:        id,
+		Score:       score,
+	}
+	n.Save()
+	list.NewList(0, feed.Feed{Id: feedID}).AppendNews(score, id)
+}
+
+// doRaw fires a request and returns the status code and raw response body, for
+// the feed/news endpoints that return bare JSON rather than the ShowData envelope.
+func doRaw(t *testing.T, method, path string, body interface{}) (int, []byte) {
+	t.Helper()
+	router := setupRouter()
+
+	var reqBody *bytes.Buffer
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			t.Fatalf("failed to marshal request body: %v", err)
+		}
+		reqBody = bytes.NewBuffer(b)
+	} else {
+		reqBody = bytes.NewBuffer(nil)
+	}
+
+	req := httptest.NewRequest(method, path, reqBody)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	return w.Code, w.Body.Bytes()
 }
 
 // apiResponse mirrors the envelope returned by response.ShowData / ShowError.
@@ -217,5 +284,127 @@ func TestLogin_TokenIsValidJWT(t *testing.T) {
 	}
 	if claims["id"] == nil || claims["id"] == "" {
 		t.Error("expected id claim to be set")
+	}
+}
+
+// --- Redis-backed reader endpoints ---------------------------------------------
+
+type feedItem struct {
+	Id    int64
+	Title string
+}
+
+type articleItem struct {
+	Id       string
+	Title    string
+	NextId   string
+	ReadFlag bool
+}
+
+// TestReaderFlow exercises the whole unread-window path through Redis:
+// subscribe -> unread count -> unread window -> open one article (marks read,
+// advances the boundary) -> mark the page read.
+func TestReaderFlow(t *testing.T) {
+	resetState(t)
+
+	// Subscribe to a feed.
+	code, body := doRaw(t, http.MethodPost, "/feed", map[string]string{
+		"url": "https://example.com/rss", "title": "Example",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("POST /feed: status %d, body %s", code, body)
+	}
+	var created feedItem
+	if err := json.Unmarshal(body, &created); err != nil {
+		t.Fatalf("POST /feed unmarshal: %v (%s)", err, body)
+	}
+	feedID := created.Id
+	id := strconv.FormatInt(feedID, 10)
+
+	// Seed three articles (oldest score first), as the sync path would.
+	seedArticle(feedID, "a1", "Article One", 100)
+	seedArticle(feedID, "a2", "Article Two", 200)
+	seedArticle(feedID, "a3", "Article Three", 300)
+
+	// GET /feeds: the feed carries "- 3" (three unread).
+	titleOf := func(want int64) string {
+		_, b := doRaw(t, http.MethodGet, "/feeds", nil)
+		var feeds []feedItem
+		if err := json.Unmarshal(b, &feeds); err != nil {
+			t.Fatalf("GET /feeds unmarshal: %v (%s)", err, b)
+		}
+		for _, f := range feeds {
+			if f.Id == want {
+				return f.Title
+			}
+		}
+		t.Fatalf("feed %d not in /feeds: %s", want, b)
+		return ""
+	}
+	if got := titleOf(feedID); !strings.HasSuffix(got, " - 3") {
+		t.Errorf("subscribed feed title = %q, want it to end with \" - 3\"", got)
+	}
+
+	// GET /news-list: the unread window has all three, none read.
+	_, body = doRaw(t, http.MethodGet, "/news-list?id="+id, nil)
+	var articles []articleItem
+	if err := json.Unmarshal(body, &articles); err != nil {
+		t.Fatalf("GET /news-list unmarshal: %v (%s)", err, body)
+	}
+	if len(articles) != 3 {
+		t.Fatalf("unread window = %d articles, want 3: %s", len(articles), body)
+	}
+	for _, a := range articles {
+		if a.ReadFlag {
+			t.Errorf("article %s should be unread in a fresh window", a.Id)
+		}
+	}
+
+	// GET /news for a1: returns its content and the next id, and marks it read.
+	_, body = doRaw(t, http.MethodGet, "/news?feedId="+id+"&id=a1", nil)
+	var one articleItem
+	if err := json.Unmarshal(body, &one); err != nil {
+		t.Fatalf("GET /news unmarshal: %v (%s)", err, body)
+	}
+	if one.Title != "Article One" {
+		t.Errorf("GET /news Title = %q, want Article One", one.Title)
+	}
+	if one.NextId != "a2" {
+		t.Errorf("GET /news NextId = %q, want a2", one.NextId)
+	}
+
+	// The read boundary advanced past a1: the window is now [a2, a3] and the
+	// feed shows two unread.
+	_, body = doRaw(t, http.MethodGet, "/news-list?id="+id, nil)
+	json.Unmarshal(body, &articles)
+	ids := make([]string, len(articles))
+	for i, a := range articles {
+		ids[i] = a.Id
+	}
+	if strings.Join(ids, ",") != "a2,a3" {
+		t.Errorf("window after reading a1 = %v, want [a2 a3]", ids)
+	}
+	if got := titleOf(feedID); !strings.HasSuffix(got, " - 2") {
+		t.Errorf("after reading a1, feed title = %q, want it to end with \" - 2\"", got)
+	}
+
+	// GET /mark-read: advance the boundary past the whole page; feed hits zero.
+	doRaw(t, http.MethodGet, "/mark-read?feedId="+id, nil)
+	if got := titleOf(feedID); !strings.HasSuffix(got, " - 0") {
+		t.Errorf("after mark-read, feed title = %q, want it to end with \" - 0\"", got)
+	}
+}
+
+// TestReaderFlow_UnknownFeed verifies an empty feed just yields an empty window.
+func TestReaderFlow_UnknownFeed(t *testing.T) {
+	resetState(t)
+
+	code, body := doRaw(t, http.MethodGet, "/news-list?id=999", nil)
+	if code != http.StatusOK {
+		t.Fatalf("GET /news-list for empty feed: status %d", code)
+	}
+	trimmed := strings.TrimSpace(string(body))
+	if trimmed != "null" && trimmed != "[]" {
+		t.Errorf("empty feed window = %s, want null or []", trimmed)
 	}
 }
