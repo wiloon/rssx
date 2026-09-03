@@ -73,11 +73,12 @@ RSSX is a modern RSS reader application consisting of:
 - Standard library routing
 
 **Frontend:**
-- Vue.js 3 (Composition API)
-- TypeScript 4.5+
+- Vue.js 3 (`<script setup>` Composition API)
+- TypeScript 5.6
 - Vuetify 3 (Material Design)
-- Webpack 5
-- Jest + Cypress (testing)
+- Pinia (state) + Vue Router 4
+- Vite 5 (build/dev), Node 18
+- Vitest + Vue Test Utils (unit); e2e not yet ported to the three-pane UI
 
 **Deployment:**
 - Docker/Podman containers
@@ -98,12 +99,15 @@ rssx/
 │   └── common/            # Common database functions
 ├── rssx-ui/               # Frontend application
 │   ├── src/
-│   │   ├── components/    # Vue components
-│   │   ├── views/         # Page views
-│   │   ├── router/        # Vue Router config
-│   │   ├── store/         # Vuex state management
+│   │   ├── api/           # Backend HTTP client (typed wrapper over the endpoints)
+│   │   ├── reader/        # Framework-agnostic reader logic (article list, store factory)
+│   │   ├── stores/        # Pinia stores (thin reactive wrappers)
+│   │   ├── components/    # Pane components (FeedColumn / ArticleColumn / ReadingPane)
+│   │   ├── views/         # Route views (Reader, Login, Register)
+│   │   ├── router/        # Vue Router 4 config
+│   │   ├── plugins/       # Vuetify setup
 │   │   └── utils/         # Frontend utilities
-│   └── tests/             # Frontend tests
+│   └── tests/unit/        # Vitest specs
 └── deploy/                # Deployment configs
     ├── docker/            # Docker build scripts
     └── k8s/               # Kubernetes manifests
@@ -307,22 +311,21 @@ golangci-lint run
 
 ### Frontend (rssx-ui/)
 ```bash
+# Requires Node 18 (see .node-version)
+
 # Install dependencies
 pnpm install
 
-# Run development server
-pnpm serve
+# Run the Vite dev server
+pnpm dev
 
-# Build for production
+# Type-check and build for production
 pnpm build
 
-# Run unit tests
+# Run unit tests (Vitest)
 pnpm test:unit
 
-# Run e2e tests
-pnpm test:e2e
-
-# Lint and fix
+# Lint
 pnpm lint
 ```
 
@@ -400,11 +403,11 @@ chore(ci): configure GitHub Actions workflow
 - Place tests in `*_test.go` files next to implementation
 
 ### Frontend Testing
-- Unit test utilities and pure functions with Jest
-- Integration test components with Vue Test Utils
-- E2E test critical user flows with Cypress
+- Unit test the framework-agnostic reader logic (src/reader/) and API client with Vitest
+- Test components through their props/events with Vue Test Utils
 - Mock API calls in tests
 - Test error states and loading states
+- E2E for the three-pane flow is not yet ported (the old Cypress specs were removed)
 
 ## Performance Considerations
 
