@@ -24,6 +24,22 @@ const onNarrowChange = (e: MediaQueryListEvent) => {
 narrowQuery?.addEventListener('change', onNarrowChange)
 onUnmounted(() => narrowQuery?.removeEventListener('change', onNarrowChange))
 
+// The left-column per-feed refresh button. The backend sync is asynchronous, so
+// hold the spinner for a beat even if the trigger call returns immediately.
+const syncingFeedId = ref<number | null>(null)
+async function onSyncFeed (feedId: number): Promise<void> {
+  if (syncingFeedId.value !== null) return
+  syncingFeedId.value = feedId
+  try {
+    await Promise.all([
+      reader.syncFeed(feedId),
+      new Promise((resolve) => setTimeout(resolve, 2000))
+    ])
+  } finally {
+    syncingFeedId.value = null
+  }
+}
+
 const selection = computed(() => ({
   feedId: reader.state.selectedFeedId,
   articleId: reader.state.list.selectedId
@@ -52,7 +68,9 @@ watch(selection, (value) => {
       class="reader__pane reader__pane--feeds"
       :feeds="reader.state.feeds"
       :selected-feed-id="reader.state.selectedFeedId"
+      :syncing-feed-id="syncingFeedId"
       @select="reader.openFeed"
+      @sync="onSyncFeed"
     />
     <ArticleColumn
       v-show="panes.includes('articles')"

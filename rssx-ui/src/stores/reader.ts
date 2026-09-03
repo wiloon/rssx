@@ -28,6 +28,7 @@ export const useReaderStore = defineStore('reader', () => {
     deselectArticle: store.deselectArticle,
     deselectFeed: store.deselectFeed,
     addFeed: store.addFeed,
-    removeFeed: store.removeFeed
+    removeFeed: store.removeFeed,
+    syncFeed: store.syncFeed
   }
 })

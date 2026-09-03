@@ -143,6 +143,42 @@ describe('reader store — orchestrates the three panes', () => {
     expect(store.state.feeds.map((f) => f.id)).toEqual([3, 9])
   })
 
+  it('syncs one feed, then refreshes the left column and the open window', async () => {
+    const api = fakeApi({
+      listFeeds: vi
+        .fn()
+        .mockResolvedValueOnce([{ id: 3, title: 'InfoQ', unread: 0 }])
+        .mockResolvedValueOnce([{ id: 3, title: 'InfoQ', unread: 4 }]),
+      listUnread: vi
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([article('a'), article('b')]),
+      syncOne: vi.fn().mockResolvedValue(undefined)
+    })
+    const store = createReaderStore(api)
+    await store.loadFeeds()
+    await store.openFeed(3)
+
+    await store.syncFeed(3)
+
+    expect(api.syncOne).toHaveBeenCalledWith(3)
+    expect(store.state.feeds).toEqual([{ id: 3, title: 'InfoQ', unread: 4 }])
+    expect(store.state.list.articles.map((a) => a.id)).toEqual(['a', 'b'])
+  })
+
+  it('syncing a feed that is not open refreshes the left column only', async () => {
+    const api = fakeApi({
+      listFeeds: vi.fn().mockResolvedValue([{ id: 9, title: 'Lobsters', unread: 1 }]),
+      syncOne: vi.fn().mockResolvedValue(undefined)
+    })
+    const store = createReaderStore(api)
+
+    await store.syncFeed(9)
+
+    expect(api.syncOne).toHaveBeenCalledWith(9)
+    expect(api.listUnread).not.toHaveBeenCalled()
+  })
+
   it('unsubscribes from a feed, refreshes the left column, and clears the panes if it was open', async () => {
     const api = fakeApi({
       listFeeds: vi
