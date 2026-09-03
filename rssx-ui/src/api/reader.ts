@@ -12,6 +12,7 @@ import { Article } from '@/reader/articleList'
 export interface HttpClient {
   get (url: string, config?: unknown): Promise<{ data: any }>
   post (url: string, data?: unknown, config?: unknown): Promise<{ data: any }>
+  put (url: string, data?: unknown, config?: unknown): Promise<{ data: any }>
   delete (url: string, config?: unknown): Promise<{ data: any }>
 }
 

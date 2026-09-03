@@ -20,10 +20,26 @@ type mockFeedRepository struct {
 	subscribeFn    func(userID string, feedID int64) error
 	unsubscribeFn  func(userID string, feedID int64) (bool, error)
 	findByUserIDFn func(userID string) ([]feed.Feed, error)
+	findByIDFn     func(feedID int64) (feed.Feed, bool, error)
+	updateFn       func(feedID int64, title, url string) (feed.Feed, bool, error)
+	deleteFn       func(feedID int64) (bool, error)
+	subscribersFn  func(feedID int64) ([]string, error)
 }
 
 func (m *mockFeedRepository) FindByUserID(userID string) ([]feed.Feed, error) {
 	return m.findByUserIDFn(userID)
+}
+func (m *mockFeedRepository) FindByID(feedID int64) (feed.Feed, bool, error) {
+	return m.findByIDFn(feedID)
+}
+func (m *mockFeedRepository) Update(feedID int64, title, url string) (feed.Feed, bool, error) {
+	return m.updateFn(feedID, title, url)
+}
+func (m *mockFeedRepository) Delete(feedID int64) (bool, error) {
+	return m.deleteFn(feedID)
+}
+func (m *mockFeedRepository) Subscribers(feedID int64) ([]string, error) {
+	return m.subscribersFn(feedID)
 }
 func (m *mockFeedRepository) FindOrCreateByURL(title, url string) (feed.Feed, error) {
 	return m.findOrCreateFn(title, url)
@@ -41,7 +57,9 @@ func (m *mockFeedRepository) Unsubscribe(userID string, feedID int64) (bool, err
 func newTestRouter(h *Handler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
+	r.GET("/feeds/detail", h.ListFeeds)
 	r.POST("/feed", h.AddFeed)
+	r.PUT("/feed/:id", h.UpdateFeed)
 	r.DELETE("/feed/:id", h.RemoveFeed)
 	return r
 }
@@ -230,5 +248,123 @@ func TestRemoveFeed_Success(t *testing.T) {
 
 	if w.Code != http.StatusNoContent {
 		t.Errorf("expected 204, got %d", w.Code)
+	}
+}
+
+// --- ListFeeds tests ---
+
+func TestListFeeds_Success(t *testing.T) {
+	mock := &mockFeedRepository{
+		findByUserIDFn: func(userID string) ([]feed.Feed, error) {
+			return []feed.Feed{
+				{Id: 1, Title: "Hacker News", Url: "https://hnrss.org/newest"},
+				{Id: 2, Title: "r/golang", Url: "https://www.reddit.com/r/golang/.rss"},
+			}, nil
+		},
+	}
+	r := newTestRouter(NewHandler(mock))
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/feeds/detail", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp []feed.Feed
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("response is not a feed list: %v", err)
+	}
+	if len(resp) != 2 || resp[0].Url != "https://hnrss.org/newest" {
+		t.Errorf("unexpected feed list: %+v", resp)
+	}
+}
+
+// --- UpdateFeed tests ---
+
+func doUpdate(t *testing.T, h *Handler, path string, body interface{}) *httptest.ResponseRecorder {
+	t.Helper()
+	r := newTestRouter(h)
+	var buf *bytes.Buffer
+	switch b := body.(type) {
+	case string:
+		buf = bytes.NewBufferString(b)
+	default:
+		raw, _ := json.Marshal(b)
+		buf = bytes.NewBuffer(raw)
+	}
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPut, path, buf)
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	return w
+}
+
+func TestUpdateFeed_InvalidID(t *testing.T) {
+	w := doUpdate(t, NewHandler(&mockFeedRepository{}), "/feed/abc",
+		map[string]string{"title": "X", "url": "https://example.com/feed"})
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestUpdateFeed_InvalidBody(t *testing.T) {
+	w := doUpdate(t, NewHandler(&mockFeedRepository{}), "/feed/1", "not-json")
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestUpdateFeed_MissingURL(t *testing.T) {
+	w := doUpdate(t, NewHandler(&mockFeedRepository{}), "/feed/1",
+		map[string]string{"title": "X"})
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestUpdateFeed_NotFound(t *testing.T) {
+	mock := &mockFeedRepository{
+		updateFn: func(feedID int64, title, url string) (feed.Feed, bool, error) {
+			return feed.Feed{}, false, nil
+		},
+	}
+	w := doUpdate(t, NewHandler(mock), "/feed/9",
+		map[string]string{"title": "X", "url": "https://example.com/feed"})
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestUpdateFeed_URLConflict(t *testing.T) {
+	mock := &mockFeedRepository{
+		updateFn: func(feedID int64, title, url string) (feed.Feed, bool, error) {
+			return feed.Feed{}, true, ErrURLConflict
+		},
+	}
+	w := doUpdate(t, NewHandler(mock), "/feed/1",
+		map[string]string{"title": "X", "url": "https://example.com/taken"})
+	if w.Code != http.StatusConflict {
+		t.Errorf("expected 409, got %d", w.Code)
+	}
+}
+
+func TestUpdateFeed_Success(t *testing.T) {
+	mock := &mockFeedRepository{
+		updateFn: func(feedID int64, title, url string) (feed.Feed, bool, error) {
+			return feed.Feed{Id: feedID, Title: title, Url: url}, true, nil
+		},
+	}
+	w := doUpdate(t, NewHandler(mock), "/feed/5",
+		map[string]string{"title": "New Title", "url": "https://example.com/feed"})
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp feed.Feed
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("response is not a feed: %v", err)
+	}
+	if resp.Id != 5 || resp.Title != "New Title" {
+		t.Errorf("unexpected feed: %+v", resp)
 	}
 }

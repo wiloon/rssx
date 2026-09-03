@@ -29,6 +29,69 @@ func (r *gormFeedRepository) FindByUserID(userID string) ([]feed.Feed, error) {
 	return result, err
 }
 
+func (r *gormFeedRepository) FindByID(feedID int64) (feed.Feed, bool, error) {
+	var f common.Feed
+	err := r.db.First(&f, feedID).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return feed.Feed{}, false, nil
+		}
+		return feed.Feed{}, false, err
+	}
+	return feed.Feed{Id: f.Id, Title: f.Title, Url: f.Url}, true, nil
+}
+
+func (r *gormFeedRepository) Update(feedID int64, title, url string) (feed.Feed, bool, error) {
+	var f common.Feed
+	if err := r.db.First(&f, feedID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return feed.Feed{}, false, nil
+		}
+		return feed.Feed{}, false, err
+	}
+
+	var clash common.Feed
+	err := r.db.Where("url = ? AND id <> ?", url, feedID).First(&clash).Error
+	if err == nil {
+		return feed.Feed{}, true, ErrURLConflict
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return feed.Feed{}, true, err
+	}
+
+	f.Title = title
+	f.Url = url
+	if err := r.db.Model(&common.Feed{}).Where("id = ?", feedID).
+		Updates(map[string]interface{}{"title": title, "url": url}).Error; err != nil {
+		return feed.Feed{}, true, err
+	}
+	return feed.Feed{Id: f.Id, Title: title, Url: url}, true, nil
+}
+
+func (r *gormFeedRepository) Delete(feedID int64) (bool, error) {
+	var removed bool
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("feed_id = ?", feedID).Delete(&common.UserFeed{}).Error; err != nil {
+			return err
+		}
+		result := tx.Delete(&common.Feed{}, feedID)
+		if result.Error != nil {
+			return result.Error
+		}
+		removed = result.RowsAffected > 0
+		return nil
+	})
+	return removed, err
+}
+
+func (r *gormFeedRepository) Subscribers(feedID int64) ([]string, error) {
+	var ids []string
+	err := r.db.Model(&common.UserFeed{}).
+		Where("feed_id = ?", feedID).
+		Pluck("user_id", &ids).Error
+	return ids, err
+}
+
 func (r *gormFeedRepository) FindOrCreateByURL(title, url string) (feed.Feed, error) {
 	f := common.Feed{Title: title, Url: url}
 	if err := r.db.Where(common.Feed{Url: url}).FirstOrCreate(&f).Error; err != nil {

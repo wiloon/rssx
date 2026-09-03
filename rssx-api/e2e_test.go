@@ -395,6 +395,98 @@ func TestReaderFlow(t *testing.T) {
 	}
 }
 
+// TestFeedManagementFlow exercises the feed maintenance endpoints:
+// create -> detail list -> rename (PUT) -> purge (hard delete), and checks that
+// the purge also wipes the feed's articles and index from Redis.
+func TestFeedManagementFlow(t *testing.T) {
+	resetState(t)
+
+	// Create a feed.
+	code, body := doRaw(t, http.MethodPost, "/feed", map[string]string{
+		"url": "https://example.com/mgmt", "title": "Before",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("POST /feed: status %d, body %s", code, body)
+	}
+	var created feedItem
+	json.Unmarshal(body, &created)
+	feedID := created.Id
+	id := strconv.FormatInt(feedID, 10)
+
+	seedArticle(feedID, "m1", "Item One", 100)
+	seedArticle(feedID, "m2", "Item Two", 200)
+
+	// GET /feeds/detail: the feed is listed with its raw title and url.
+	code, body = doRaw(t, http.MethodGet, "/feeds/detail", nil)
+	if code != http.StatusOK {
+		t.Fatalf("GET /feeds/detail: status %d", code)
+	}
+	var detail []struct {
+		Id    int64
+		Title string
+		Url   string
+	}
+	if err := json.Unmarshal(body, &detail); err != nil {
+		t.Fatalf("GET /feeds/detail unmarshal: %v (%s)", err, body)
+	}
+	found := false
+	for _, f := range detail {
+		if f.Id == feedID {
+			found = true
+			if f.Title != "Before" || f.Url != "https://example.com/mgmt" {
+				t.Errorf("detail row = %+v, want raw title/url", f)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("feed %d missing from /feeds/detail: %s", feedID, body)
+	}
+
+	// PUT /feed/:id renames it.
+	code, body = doRaw(t, http.MethodPut, "/feed/"+id, map[string]string{
+		"url": "https://example.com/mgmt", "title": "After",
+	})
+	if code != http.StatusOK {
+		t.Fatalf("PUT /feed/%s: status %d, body %s", id, code, body)
+	}
+	var updated feedItem
+	json.Unmarshal(body, &updated)
+	if updated.Title != "After" {
+		t.Errorf("PUT /feed title = %q, want After", updated.Title)
+	}
+
+	// DELETE /feed/:id/purge removes it outright.
+	code, body = doRaw(t, http.MethodDelete, "/feed/"+id+"/purge", nil)
+	if code != http.StatusNoContent {
+		t.Fatalf("DELETE /feed/%s/purge: status %d, body %s", id, code, body)
+	}
+
+	// The feed is gone from the detail list.
+	_, body = doRaw(t, http.MethodGet, "/feeds/detail", nil)
+	json.Unmarshal(body, &detail)
+	for _, f := range detail {
+		if f.Id == feedID {
+			t.Errorf("feed %d still in /feeds/detail after purge: %s", feedID, body)
+		}
+	}
+
+	// Redis: the article index is empty and the article hashes are gone.
+	if n := list.Count(int(feedID)); n != 0 {
+		t.Errorf("feed_news index size = %d after purge, want 0", n)
+	}
+	for _, k := range []string{"news:m1", "news:m2"} {
+		if miniRedis.Exists(k) {
+			t.Errorf("Redis key %q still exists after purge", k)
+		}
+	}
+
+	// Purging a feed that does not exist is a 404.
+	code, _ = doRaw(t, http.MethodDelete, "/feed/"+id+"/purge", nil)
+	if code != http.StatusNotFound {
+		t.Errorf("purge of missing feed: status %d, want 404", code)
+	}
+}
+
 // TestReaderFlow_UnknownFeed verifies an empty feed just yields an empty window.
 func TestReaderFlow_UnknownFeed(t *testing.T) {
 	resetState(t)

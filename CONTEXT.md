@@ -15,6 +15,13 @@ The link between a user and a Feed. Adding a Feed to your list creates a
 Subscription; removing it deletes the Subscription, not the Feed.
 _Avoid_: follow, watch
 
+**Purge**:
+Deleting a Feed outright — its row, every Subscription to it, and all of its
+Articles and read state in Redis. Distinct from removing a Subscription, which
+leaves the Feed intact. Exposed as `DELETE /feed/:id/purge` and the delete
+action on the feed management page.
+_Avoid_: (using "delete" without saying which)
+
 **Article**:
 One item fetched from a Feed: title, publish date, source URL, and the content the
 Feed provided (often only a summary). Identified by a per-Feed id.

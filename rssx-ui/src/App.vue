@@ -20,6 +20,14 @@ function logout (): void {
     <v-app-bar density="compact" flat>
       <v-app-bar-title>RSSX</v-app-bar-title>
       <template #append>
+        <v-btn
+          v-if="loggedIn"
+          data-cy="manage-feeds"
+          variant="text"
+          :to="{ name: 'FeedManager' }"
+        >
+          订阅源
+        </v-btn>
         <v-btn v-if="loggedIn" data-cy="logout" variant="text" @click="logout">
           退出
         </v-btn>
