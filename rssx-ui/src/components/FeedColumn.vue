@@ -34,7 +34,7 @@ defineEmits<{
           class="feed-column__sync"
           :class="{ 'is-syncing': feed.id === syncingFeedId }"
           :disabled="feed.id === syncingFeedId"
-          title="同步该订阅源"
+          title="Sync this feed"
           @click.stop="$emit('sync', feed.id)"
         >
           ↻

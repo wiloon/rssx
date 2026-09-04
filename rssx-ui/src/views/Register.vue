@@ -13,7 +13,7 @@ const msg = ref('')
 
 async function register (): Promise<void> {
   if (password.value !== passwordCheck.value) {
-    msg.value = '两次输入的密码不一致'
+    msg.value = 'The two passwords do not match'
     snackbar.value = true
     return
   }
@@ -33,21 +33,21 @@ async function register (): Promise<void> {
 
 <template>
   <v-container class="mx-auto" style="max-width: 400px">
-    <v-text-field v-model="name" data-cy="user-name" label="用户名" />
+    <v-text-field v-model="name" data-cy="user-name" label="Username" />
     <v-text-field
       v-model="password"
       data-cy="password"
-      label="密码"
+      label="Password"
       type="password"
     />
     <v-text-field
       v-model="passwordCheck"
       data-cy="password-check"
-      label="密码确认"
+      label="Confirm password"
       type="password"
     />
     <v-btn block color="primary" data-cy="register" @click="register">
-      注册
+      Sign up
     </v-btn>
     <v-snackbar v-model="snackbar" :timeout="3000">{{ msg }}</v-snackbar>
   </v-container>
