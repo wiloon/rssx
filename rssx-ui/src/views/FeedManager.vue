@@ -27,7 +27,7 @@ async function refresh (): Promise<void> {
   try {
     feeds.value = await api.list()
   } catch (err) {
-    notify(errorText(err, '加载订阅源失败'))
+    notify(errorText(err, 'Failed to load feeds'))
   } finally {
     loading.value = false
   }
@@ -39,7 +39,7 @@ const adding = ref(false)
 
 async function add (): Promise<void> {
   if (draft.title.trim() === '' || draft.url.trim() === '') {
-    notify('标题和 URL 都不能为空')
+    notify('Title and URL are both required')
     return
   }
   adding.value = true
@@ -47,10 +47,10 @@ async function add (): Promise<void> {
     await api.create(draft.title.trim(), draft.url.trim())
     draft.title = ''
     draft.url = ''
-    notify('已添加')
+    notify('Feed added')
     await refresh()
   } catch (err) {
-    notify(errorText(err, '添加失败'))
+    notify(errorText(err, 'Failed to add feed'))
   } finally {
     adding.value = false
   }
@@ -70,17 +70,17 @@ function openEdit (feed: AdminFeed): void {
 
 async function saveEdit (): Promise<void> {
   if (editing.title.trim() === '' || editing.url.trim() === '') {
-    notify('标题和 URL 都不能为空')
+    notify('Title and URL are both required')
     return
   }
   saving.value = true
   try {
     await api.update(editing.id, editing.title.trim(), editing.url.trim())
     editDialog.value = false
-    notify('已保存')
+    notify('Changes saved')
     await refresh()
   } catch (err) {
-    notify(errorText(err, '保存失败'))
+    notify(errorText(err, 'Failed to save changes'))
   } finally {
     saving.value = false
   }
@@ -102,10 +102,10 @@ async function confirmDelete (): Promise<void> {
   try {
     await api.remove(target.value.id)
     deleteDialog.value = false
-    notify('已删除')
+    notify('Feed deleted')
     await refresh()
   } catch (err) {
-    notify(errorText(err, '删除失败'))
+    notify(errorText(err, 'Failed to delete feed'))
   } finally {
     deleting.value = false
   }
@@ -115,9 +115,9 @@ async function confirmDelete (): Promise<void> {
 async function syncNow (feed: AdminFeed): Promise<void> {
   try {
     await api.sync(feed.id)
-    notify(`已触发同步：${feed.title}`)
+    notify(`Sync triggered: ${feed.title}`)
   } catch (err) {
-    notify(errorText(err, '同步失败'))
+    notify(errorText(err, 'Failed to sync feed'))
   }
 }
 
@@ -127,9 +127,9 @@ onMounted(refresh)
 <template>
   <v-container class="feed-manager" style="max-width: 900px">
     <div class="feed-manager__header">
-      <h2>订阅源管理</h2>
+      <h2>Feed Manager</h2>
       <v-btn variant="text" data-test="back-to-reader" @click="router.push({ name: 'Reader' })">
-        返回阅读
+        Back to reader
       </v-btn>
     </div>
 
@@ -138,7 +138,7 @@ onMounted(refresh)
         <v-text-field
           v-model="draft.title"
           data-test="add-title"
-          label="标题"
+          label="Title"
           density="compact"
           hide-details
         />
@@ -155,7 +155,7 @@ onMounted(refresh)
           :loading="adding"
           @click="add"
         >
-          添加
+          Add
         </v-btn>
       </div>
     </v-sheet>
@@ -163,14 +163,14 @@ onMounted(refresh)
     <v-table data-test="feed-table">
       <thead>
         <tr>
-          <th>标题</th>
+          <th>Title</th>
           <th>URL</th>
-          <th class="text-right">操作</th>
+          <th class="text-right">Actions</th>
         </tr>
       </thead>
       <tbody>
         <tr v-if="!loading && feeds.length === 0">
-          <td colspan="3" class="text-medium-emphasis">还没有订阅源</td>
+          <td colspan="3" class="text-medium-emphasis">No feeds yet</td>
         </tr>
         <tr v-for="feed in feeds" :key="feed.id" data-test="feed-row">
           <td data-test="feed-title">{{ feed.title }}</td>
@@ -179,10 +179,10 @@ onMounted(refresh)
           </td>
           <td class="text-right">
             <v-btn size="small" variant="text" data-test="sync" @click="syncNow(feed)">
-              同步
+              Sync
             </v-btn>
             <v-btn size="small" variant="text" data-test="edit" @click="openEdit(feed)">
-              编辑
+              Edit
             </v-btn>
             <v-btn
               size="small"
@@ -191,7 +191,7 @@ onMounted(refresh)
               data-test="delete"
               @click="openDelete(feed)"
             >
-              删除
+              Delete
             </v-btn>
           </td>
         </tr>
@@ -200,21 +200,21 @@ onMounted(refresh)
 
     <v-dialog v-model="editDialog" max-width="500">
       <v-card>
-        <v-card-title>编辑订阅源</v-card-title>
+        <v-card-title>Edit feed</v-card-title>
         <v-card-text>
-          <v-text-field v-model="editing.title" data-test="edit-title" label="标题" />
+          <v-text-field v-model="editing.title" data-test="edit-title" label="Title" />
           <v-text-field v-model="editing.url" data-test="edit-url" label="RSS URL" />
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" @click="editDialog = false">取消</v-btn>
+          <v-btn variant="text" @click="editDialog = false">Cancel</v-btn>
           <v-btn
             color="primary"
             data-test="edit-save"
             :loading="saving"
             @click="saveEdit"
           >
-            保存
+            Save
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -222,20 +222,21 @@ onMounted(refresh)
 
     <v-dialog v-model="deleteDialog" max-width="460">
       <v-card>
-        <v-card-title>彻底删除订阅源</v-card-title>
+        <v-card-title>Permanently delete feed</v-card-title>
         <v-card-text>
-          将删除「{{ target?.title }}」及其全部已抓取文章和已读记录，此操作不可恢复。
+          This will delete "{{ target?.title }}" along with all of its fetched articles
+          and read history. This action cannot be undone.
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" @click="deleteDialog = false">取消</v-btn>
+          <v-btn variant="text" @click="deleteDialog = false">Cancel</v-btn>
           <v-btn
             color="error"
             data-test="delete-confirm"
             :loading="deleting"
             @click="confirmDelete"
           >
-            删除
+            Delete
           </v-btn>
         </v-card-actions>
       </v-card>

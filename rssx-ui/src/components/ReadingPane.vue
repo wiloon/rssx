@@ -33,7 +33,7 @@ defineEmits<{
             target="_blank"
             rel="noopener"
           >
-            打开原文
+            Open original
           </a>
         </p>
         <!-- Feed-provided HTML; sanitising is a follow-up (docs/adr/0001). -->
@@ -49,13 +49,13 @@ defineEmits<{
             :disabled="open.nextId === ''"
             @click="$emit('next')"
           >
-            下一篇
+            Next
           </button>
         </div>
       </div>
     </template>
 
-    <p v-else data-test="empty" class="reading-pane__empty">选择一篇文章</p>
+    <p v-else data-test="empty" class="reading-pane__empty">Select an article</p>
   </article>
 </template>
 

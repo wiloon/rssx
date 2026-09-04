@@ -27,14 +27,14 @@ async function login (): Promise<void> {
 
 <template>
   <v-container class="mx-auto" style="max-width: 400px">
-    <v-text-field v-model="name" data-cy="user-name" label="用户名" />
+    <v-text-field v-model="name" data-cy="user-name" label="Username" />
     <v-text-field
       v-model="password"
       data-cy="password"
-      label="密码"
+      label="Password"
       type="password"
     />
-    <v-btn block color="primary" data-cy="login" @click="login">登录</v-btn>
+    <v-btn block color="primary" data-cy="login" @click="login">Sign in</v-btn>
     <v-snackbar v-model="snackbar" :timeout="3000">{{ msg }}</v-snackbar>
   </v-container>
 </template>

@@ -10,6 +10,11 @@
 - Test descriptions and assertions
 - Configuration comments
 - API documentation
+- **User-facing UI text** — every string the user can see: menu items, button labels,
+  form labels and placeholders, tooltips and `title` attributes, dialog titles and body
+  copy, table headers, empty-state and loading text, and snackbar / toast / notification
+  messages. This covers `rssx-ui` templates, `.vue` files, i18n resource files, and any
+  strings passed to `notify()` or thrown as user-visible errors.
 
 No exceptions. This applies to all AI-generated and human-written content.
 

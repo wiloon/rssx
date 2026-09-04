@@ -41,9 +41,9 @@ defineEmits<{
 
     <footer v-if="feedSelected" class="article-column__footer">
       <button data-test="mark-page-read" @click="$emit('mark-page-read')">
-        标记本页已读
+        Mark page as read
       </button>
-      <button data-test="load-more" @click="$emit('load-more')">加载更多</button>
+      <button data-test="load-more" @click="$emit('load-more')">Load more</button>
     </footer>
   </section>
 </template>

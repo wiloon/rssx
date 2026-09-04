@@ -26,10 +26,10 @@ function logout (): void {
           variant="text"
           :to="{ name: 'FeedManager' }"
         >
-          订阅源
+          Feeds
         </v-btn>
         <v-btn v-if="loggedIn" data-cy="logout" variant="text" @click="logout">
-          退出
+          Logout
         </v-btn>
       </template>
     </v-app-bar>
