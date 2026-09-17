@@ -97,18 +97,21 @@ watch(selection, (value) => {
 .reader {
   display: flex;
   height: calc(100vh - 48px);
+  background: #f5f6f8;
 }
 .reader__pane {
   overflow-y: auto;
   height: 100%;
+  background: #fff;
 }
 .reader__pane--feeds {
-  flex: 0 0 240px;
-  border-right: 1px solid rgba(0, 0, 0, 0.12);
+  flex: 0 0 260px;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fafafa;
 }
 .reader__pane--articles {
-  flex: 0 0 360px;
-  border-right: 1px solid rgba(0, 0, 0, 0.12);
+  flex: 0 0 380px;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
 }
 .reader__pane--reading {
   flex: 1;
