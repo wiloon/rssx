@@ -43,3 +43,13 @@ _Avoid_: cursor, offset, watermark
 A pseudo-Feed (id `-1`) in the left column that aggregates Articles across every
 Subscription rather than representing one real Feed.
 _Avoid_: inbox, everything, smart feed
+
+**Reading pane**:
+The right column of the Reader. It shows at most one open Article.
+_Avoid_: article page, news view, homepage
+
+**Catglish**:
+The Chrome extension that provides click-to-lookup on English words in the open
+Article. RSSX shows whether it is installed and signed in; it does not look words
+up itself. See `docs/adr/0003-catglish-on-the-open-article.md`.
+_Avoid_: ENX (the repo name), translator, built-in dictionary
