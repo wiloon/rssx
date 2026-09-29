@@ -44,9 +44,26 @@ type News struct {
 
 // UserFeed 用户订阅表
 type UserFeed struct {
-	UserId string `gorm:"index;not null"`
-	FeedId int64  `gorm:"index;not null"`
+	UserId string `gorm:"index;uniqueIndex:idx_user_feeds_user_feed;not null"`
+	FeedId int64  `gorm:"index;uniqueIndex:idx_user_feeds_user_feed;not null"`
 	Sort   int    `gorm:"default:0"`
+}
+
+// dedupeUserFeeds removes duplicate (user_id, feed_id) rows, keeping the first,
+// so AutoMigrate can create the unique index on databases that predate it.
+func dedupeUserFeeds(db *gorm.DB) error {
+	if !db.Migrator().HasTable(&UserFeed{}) {
+		return nil
+	}
+	result := db.Exec(`DELETE FROM user_feeds WHERE rowid NOT IN (
+		SELECT MIN(rowid) FROM user_feeds GROUP BY user_id, feed_id)`)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected > 0 {
+		zapLog.Infof("removed %d duplicate user_feeds rows", result.RowsAffected)
+	}
+	return nil
 }
 
 // getDatabasePath 获取数据库路径（支持环境变量）
@@ -125,6 +142,11 @@ func init() {
 	})
 	if err != nil {
 		zapLog.Error("failed to init db: %s, error: %v", rssxDb, err)
+		return
+	}
+
+	if err = dedupeUserFeeds(DB); err != nil {
+		zapLog.Errorf("failed to dedupe user_feeds, error: %v", err)
 		return
 	}
 

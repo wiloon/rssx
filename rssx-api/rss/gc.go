@@ -4,7 +4,6 @@ import (
 	"rssx/feed/news/list"
 	"rssx/feeds"
 	"rssx/storage/redisx"
-	"rssx/user"
 	"rssx/utils"
 	"rssx/utils/config"
 	log "rssx/utils/logger"
@@ -12,19 +11,26 @@ import (
 	"time"
 )
 
+// retentionCutoff returns the instant before which articles are expired, from
+// news.expire-time (a negative duration, default -720h).
+func retentionCutoff() time.Time {
+	d, err := time.ParseDuration(config.GetString("news.expire-time", "-720h"))
+	if err != nil {
+		log.Errorf("invalid news.expire-time, using -720h: %v", err)
+		d = -720 * time.Hour
+	}
+	return time.Now().Add(d)
+}
+
 func Gc() {
 	gcDuration, _ := time.ParseDuration(config.GetString("news.gc-duration", "24h"))
 	ticker := time.NewTicker(gcDuration)
 	for ; true; <-ticker.C {
 		// clear cache
 		//删除一段时间 之前 的数据。
-		// 取一个月之前的score
-		expireTime := config.GetString("news.expire-time", "-720h")
-		d, _ := time.ParseDuration(expireTime)
-		oneMonthAgo := time.Now().Add(d)
-		oneMonthAgoMicroSecond := utils.TimeToMicroSecond(oneMonthAgo)
+		oneMonthAgoMicroSecond := utils.TimeToMicroSecond(retentionCutoff())
 
-		tmp := feeds.FindUserFeeds(user.DefaultId)
+		tmp := feeds.FindSubscribedFeeds()
 
 		for _, v := range *tmp {
 			feedId := int(v.Id)

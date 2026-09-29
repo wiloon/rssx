@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"rssx/feeds"
+	"rssx/utils/jwt"
 	log "rssx/utils/logger"
 
 	"github.com/gin-gonic/gin"
@@ -17,7 +18,8 @@ func SyncAll(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "sync started"})
 }
 
-// SyncOne triggers an immediate sync of a single feed by ID.
+// SyncOne triggers an immediate sync of a single feed the current user
+// subscribes to.
 func SyncOne(c *gin.Context) {
 	idStr := c.Param("id")
 	feedId, err := strconv.Atoi(idStr)
@@ -26,7 +28,7 @@ func SyncOne(c *gin.Context) {
 		return
 	}
 
-	feedList := feeds.FindUserFeeds("0")
+	feedList := feeds.FindUserFeeds(jwt.UserIdFromContext(c))
 	for _, f := range *feedList {
 		if int(f.Id) == feedId {
 			log.Infof("manual sync feed triggered, id: %d", feedId)

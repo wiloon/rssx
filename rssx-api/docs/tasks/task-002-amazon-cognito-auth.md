@@ -1,6 +1,6 @@
 # Task Spec: #002 — Social Login via Cognito (Google native + WeChat via Casdoor)
 
-**Status:** Pending
+**Status:** Superseded (2026-09-29) — the auth upgrade path is now Clerk, shared with ENX; see [`docs/ROADMAP.md`](../../../docs/ROADMAP.md#authentication-local-password-now-clerk-later). Kept for history.
 **Priority:** P2
 **Depends on:** None (can be done independently of #001)
 

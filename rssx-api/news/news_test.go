@@ -1,6 +1,7 @@
 package news
 
 import (
+	"errors"
 	"os"
 	"testing"
 
@@ -26,7 +27,7 @@ func TestNews_MarkReadThenIsRead(t *testing.T) {
 		t.Fatal("article should not be read before MarkRead")
 	}
 
-	n.MarkRead(0)
+	n.MarkRead("0")
 
 	if !n.IsRead("0") {
 		t.Fatal("article should be read after MarkRead")
@@ -37,13 +38,25 @@ func TestNews_IsRead_ScopedPerFeed(t *testing.T) {
 	a := News{Id: "shared", FeedId: 1}
 	b := News{Id: "shared", FeedId: 2}
 
-	a.MarkRead(0)
+	a.MarkRead("0")
 
 	if !a.IsRead("0") {
 		t.Fatal("feed 1 article should be read")
 	}
 	if b.IsRead("0") {
 		t.Fatal("same id under a different feed must not be read")
+	}
+}
+
+func TestNews_IsRead_ScopedPerUser(t *testing.T) {
+	alice := News{Id: "per-user", FeedId: 9}
+	alice.MarkRead("2fe58b86-0d30-47bd-906b-f7b4dec4dfb3")
+
+	if !alice.IsRead("2fe58b86-0d30-47bd-906b-f7b4dec4dfb3") {
+		t.Fatal("article should be read for the user who read it")
+	}
+	if alice.IsRead("another-user") {
+		t.Fatal("read mark must not leak to another user")
 	}
 }
 
@@ -61,7 +74,9 @@ func TestNews_SaveAndLoad(t *testing.T) {
 	n.Save()
 
 	got := News{Id: "save1"}
-	got.Load()
+	if err := got.Load(); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
 
 	if got.Title != "Hello" || got.Url != "https://example.com/save1" {
 		t.Fatalf("Load = %+v", got)
@@ -71,5 +86,12 @@ func TestNews_SaveAndLoad(t *testing.T) {
 	}
 	if got.Score != 1234 {
 		t.Fatalf("Load Score = %d, want 1234", got.Score)
+	}
+}
+
+func TestNews_Load_MissingReturnsNotFound(t *testing.T) {
+	got := News{Id: "does-not-exist"}
+	if err := got.Load(); !errors.Is(err, ErrNewsNotFound) {
+		t.Fatalf("Load of missing article: err = %v, want ErrNewsNotFound", err)
 	}
 }

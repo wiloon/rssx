@@ -7,6 +7,7 @@ import (
 	"rssx/feed"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type gormFeedRepository struct {
@@ -114,7 +115,14 @@ func (r *gormFeedRepository) IsSubscribed(userID string, feedID int64) (bool, er
 
 func (r *gormFeedRepository) Subscribe(userID string, feedID int64) error {
 	uf := common.UserFeed{UserId: userID, FeedId: feedID}
-	return r.db.Create(&uf).Error
+	result := r.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&uf)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrAlreadySubscribed
+	}
+	return nil
 }
 
 func (r *gormFeedRepository) Unsubscribe(userID string, feedID int64) (bool, error) {

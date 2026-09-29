@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -92,12 +93,16 @@ func GetJwtToken(jwtPayload Payload) (token string, err error) {
 // Returns the parsed Payload or an error if the token is invalid.
 // Possible errors: token is expired, signature is invalid, or token is malformed.
 func ParseToken(tokenString string) (jwtPayload *Payload, err error) {
+	key := config.GetString("rssx.security-key", "")
+	if key == "" {
+		return nil, errors.New("rssx.security-key is not configured")
+	}
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		// Validate the signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return []byte(config.GetString("rssx.security-key", "")), nil
+		return []byte(key), nil
 	})
 
 	if err != nil {
@@ -183,6 +188,39 @@ func GetJwtTokenFromHeader(c *gin.Context) string {
 		token = arr[1]
 	}
 	return token
+}
+
+// ContextKeyUserId is the gin context key under which RequireAuth stores the
+// authenticated user's ID.
+const ContextKeyUserId = "userId"
+
+// RequireAuth is a gin middleware that rejects requests without a valid
+// "Authorization: Bearer <token>" header with 401 Unauthorized.
+func RequireAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		token := GetJwtTokenFromHeader(c)
+		if token == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing bearer token"})
+			return
+		}
+		p, err := ParseToken(token)
+		if err == nil && p.Id == "" {
+			err = errors.New("token has no user id")
+		}
+		if err != nil {
+			logger.Warnf("rejected request to %s: %v", c.FullPath(), err)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+			return
+		}
+		c.Set(ContextKeyUserId, p.Id)
+		c.Next()
+	}
+}
+
+// UserIdFromContext returns the authenticated user's ID stored by RequireAuth,
+// or "" when the route is not behind RequireAuth.
+func UserIdFromContext(c *gin.Context) string {
+	return c.GetString(ContextKeyUserId)
 }
 
 // GetUserId extracts the user ID from the JWT token in the request header.

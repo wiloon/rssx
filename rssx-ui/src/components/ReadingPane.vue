@@ -1,9 +1,15 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { OpenArticle } from '@/api/reader'
+import { sanitizeFeedHtml } from '@/utils/sanitize'
 
-defineProps<{
+const props = defineProps<{
   open: OpenArticle | null
 }>()
+
+const safeContent = computed(() =>
+  props.open ? sanitizeFeedHtml(props.open.article.content) : ''
+)
 
 defineEmits<{
   (e: 'next'): void
@@ -37,12 +43,12 @@ defineEmits<{
             Open original
           </a>
         </p>
-        <!-- Feed-provided HTML; sanitising is a follow-up (docs/adr/0001). -->
+        <!-- Feed-provided HTML, passed through DOMPurify. -->
         <!-- eslint-disable-next-line vue/no-v-html -->
         <div
           data-test="body"
           class="reading-pane__body"
-          v-html="open.article.content"
+          v-html="safeContent"
         />
         <div class="reading-pane__footer">
           <button

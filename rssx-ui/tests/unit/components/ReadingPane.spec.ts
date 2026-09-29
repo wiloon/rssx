@@ -36,6 +36,38 @@ describe('ReadingPane — the right pane', () => {
     )
   })
 
+  it('strips scripts, event handlers and javascript: URLs from the content', () => {
+    const wrapper = mount(ReadingPane, {
+      props: {
+        open: open({
+          content:
+            '<p>ok</p><script>alert(1)</script>' +
+            '<img src="x.png" onerror="alert(2)">' +
+            '<a href="javascript:alert(3)">bad</a>' +
+            '<iframe src="https://evil.example"></iframe>'
+        })
+      }
+    })
+
+    const body = wrapper.get('[data-test="body"]')
+    expect(body.html()).toContain('<p>ok</p>')
+    expect(body.find('script').exists()).toBe(false)
+    expect(body.find('iframe').exists()).toBe(false)
+    expect(body.get('img').attributes('onerror')).toBeUndefined()
+    expect(body.get('a').attributes('href')).toBeUndefined()
+  })
+
+  it('opens content links in a new tab without an opener', () => {
+    const wrapper = mount(ReadingPane, {
+      props: { open: open({ content: '<a href="https://example.com/x">x</a>' }) }
+    })
+
+    const link = wrapper.get('[data-test="body"] a')
+    expect(link.attributes('href')).toBe('https://example.com/x')
+    expect(link.attributes('target')).toBe('_blank')
+    expect(link.attributes('rel')).toBe('noopener noreferrer')
+  })
+
   it('emits next, unless there is no next article', async () => {
     const wrapper = mount(ReadingPane, { props: { open: open({}, 'n1') } })
     await wrapper.get('[data-test="next"]').trigger('click')

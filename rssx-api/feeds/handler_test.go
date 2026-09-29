@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"rssx/feed"
+	"rssx/utils/jwt"
 
 	"github.com/gin-gonic/gin"
 )
@@ -54,9 +55,14 @@ func (m *mockFeedRepository) Unsubscribe(userID string, feedID int64) (bool, err
 	return m.unsubscribeFn(userID, feedID)
 }
 
+// testUserID is the authenticated user newTestRouter puts in the context, as
+// jwt.RequireAuth would.
+const testUserID = "test-user"
+
 func newTestRouter(h *Handler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
+	r.Use(func(c *gin.Context) { c.Set(jwt.ContextKeyUserId, testUserID) })
 	r.GET("/feeds/detail", h.ListFeeds)
 	r.POST("/feed", h.AddFeed)
 	r.PUT("/feed/:id", h.UpdateFeed)
@@ -136,6 +142,33 @@ func TestAddFeed_AlreadySubscribed(t *testing.T) {
 	}
 	h := NewHandler(mock)
 	r := newTestRouter(h)
+
+	body, _ := json.Marshal(map[string]string{"url": "https://example.com/feed", "title": "Example"})
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, "/feed", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Errorf("expected 409, got %d", w.Code)
+	}
+}
+
+// TestAddFeed_ConcurrentDuplicate covers the race where IsSubscribed passes but
+// another request inserted the subscription first.
+func TestAddFeed_ConcurrentDuplicate(t *testing.T) {
+	mock := &mockFeedRepository{
+		findOrCreateFn: func(title, url string) (feed.Feed, error) {
+			return feed.Feed{Id: 1, Title: title, Url: url}, nil
+		},
+		isSubscribedFn: func(userID string, feedID int64) (bool, error) {
+			return false, nil
+		},
+		subscribeFn: func(userID string, feedID int64) error {
+			return ErrAlreadySubscribed
+		},
+	}
+	r := newTestRouter(NewHandler(mock))
 
 	body, _ := json.Marshal(map[string]string{"url": "https://example.com/feed", "title": "Example"})
 	w := httptest.NewRecorder()
@@ -323,8 +356,42 @@ func TestUpdateFeed_MissingURL(t *testing.T) {
 	}
 }
 
+// onlyTestUser is a Subscribers stub where the test user is the sole subscriber.
+func onlyTestUser(feedID int64) ([]string, error) { return []string{testUserID}, nil }
+
+func TestUpdateFeed_NotSubscribed(t *testing.T) {
+	mock := &mockFeedRepository{
+		subscribersFn: func(feedID int64) ([]string, error) { return []string{"someone-else"}, nil },
+		updateFn: func(feedID int64, title, url string) (feed.Feed, bool, error) {
+			t.Fatal("Update must not be called for a feed the user does not subscribe to")
+			return feed.Feed{}, false, nil
+		},
+	}
+	w := doUpdate(t, NewHandler(mock), "/feed/9",
+		map[string]string{"title": "X", "url": "https://example.com/feed"})
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestUpdateFeed_SharedFeed(t *testing.T) {
+	mock := &mockFeedRepository{
+		subscribersFn: func(feedID int64) ([]string, error) { return []string{testUserID, "someone-else"}, nil },
+		updateFn: func(feedID int64, title, url string) (feed.Feed, bool, error) {
+			t.Fatal("Update must not be called for a shared feed")
+			return feed.Feed{}, false, nil
+		},
+	}
+	w := doUpdate(t, NewHandler(mock), "/feed/9",
+		map[string]string{"title": "X", "url": "https://example.com/feed"})
+	if w.Code != http.StatusConflict {
+		t.Errorf("expected 409, got %d", w.Code)
+	}
+}
+
 func TestUpdateFeed_NotFound(t *testing.T) {
 	mock := &mockFeedRepository{
+		subscribersFn: onlyTestUser,
 		updateFn: func(feedID int64, title, url string) (feed.Feed, bool, error) {
 			return feed.Feed{}, false, nil
 		},
@@ -338,6 +405,7 @@ func TestUpdateFeed_NotFound(t *testing.T) {
 
 func TestUpdateFeed_URLConflict(t *testing.T) {
 	mock := &mockFeedRepository{
+		subscribersFn: onlyTestUser,
 		updateFn: func(feedID int64, title, url string) (feed.Feed, bool, error) {
 			return feed.Feed{}, true, ErrURLConflict
 		},
@@ -351,6 +419,7 @@ func TestUpdateFeed_URLConflict(t *testing.T) {
 
 func TestUpdateFeed_Success(t *testing.T) {
 	mock := &mockFeedRepository{
+		subscribersFn: onlyTestUser,
 		updateFn: func(feedID int64, title, url string) (feed.Feed, bool, error) {
 			return feed.Feed{Id: feedID, Title: title, Url: url}, true, nil
 		},

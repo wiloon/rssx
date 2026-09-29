@@ -9,11 +9,13 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"rssx/common"
 	"rssx/feed"
 	"rssx/feed/news/list"
 	"rssx/news"
+	rssxjwt "rssx/utils/jwt"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/golang-jwt/jwt/v5"
@@ -28,6 +30,7 @@ var miniRedis *miniredis.Miniredis
 func TestMain(m *testing.M) {
 	// Set security key so JWT signing/parsing uses a known key during tests.
 	os.Setenv("SECURITY_KEY", testSecurityKey)
+	os.Setenv("RSSX_SECURITY_KEY", testSecurityKey)
 
 	// Point redisx at an in-memory Redis. REDIS_ADDRESS must be set before the
 	// first redisx call, since the connection pool initialises lazily once.
@@ -71,9 +74,29 @@ func seedArticle(feedID int64, id, title string, score int64) {
 	list.NewList(0, feed.Feed{Id: feedID}).AppendNews(score, id)
 }
 
-// doRaw fires a request and returns the status code and raw response body, for
-// the feed/news endpoints that return bare JSON rather than the ShowData envelope.
+// doRaw fires an authenticated request and returns the status code and raw
+// response body, for the feed/news endpoints that return bare JSON rather than
+// the ShowData envelope.
 func doRaw(t *testing.T, method, path string, body interface{}) (int, []byte) {
+	t.Helper()
+	return doRawAs(t, testUserAlice, method, path, body)
+}
+
+// Test user ids; tokens only need an id claim, not a users row.
+const (
+	testUserAlice = "e2e-alice"
+	testUserBob   = "e2e-bob"
+)
+
+// doRawAs is doRaw authenticated as the given user id.
+func doRawAs(t *testing.T, userId, method, path string, body interface{}) (int, []byte) {
+	t.Helper()
+	return doRawWithAuth(t, method, path, body, "Bearer "+rssxjwt.NewToken(userId))
+}
+
+// doRawWithAuth is doRaw with an explicit Authorization header value; an empty
+// value sends no header at all.
+func doRawWithAuth(t *testing.T, method, path string, body interface{}, authorization string) (int, []byte) {
 	t.Helper()
 	router := setupRouter()
 
@@ -90,9 +113,80 @@ func doRaw(t *testing.T, method, path string, body interface{}) (int, []byte) {
 
 	req := httptest.NewRequest(method, path, reqBody)
 	req.Header.Set("Content-Type", "application/json")
+	if authorization != "" {
+		req.Header.Set("Authorization", authorization)
+	}
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	return w.Code, w.Body.Bytes()
+}
+
+// TestProtectedEndpoints_RequireAuth verifies every reader and feed-management
+// endpoint rejects requests without a valid bearer token.
+func TestProtectedEndpoints_RequireAuth(t *testing.T) {
+	resetState(t)
+
+	expired := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"id":  testUserAlice,
+		"exp": time.Now().Add(-time.Hour).Unix(),
+	})
+	expiredToken, _ := expired.SignedString([]byte(testSecurityKey))
+	forged := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"id":  testUserAlice,
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+	forgedToken, _ := forged.SignedString([]byte("not-the-server-key"))
+	noId := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+	noIdToken, _ := noId.SignedString([]byte(testSecurityKey))
+
+	authHeaders := map[string]string{
+		"no header":         "",
+		"malformed token":   "Bearer not-a-jwt",
+		"expired token":     "Bearer " + expiredToken,
+		"wrong signing key": "Bearer " + forgedToken,
+		"token without id":  "Bearer " + noIdToken,
+	}
+	endpoints := []struct{ method, path string }{
+		{http.MethodGet, "/feeds"},
+		{http.MethodGet, "/feeds/detail"},
+		{http.MethodPost, "/feed"},
+		{http.MethodPut, "/feed/1"},
+		{http.MethodDelete, "/feed/1"},
+		{http.MethodDelete, "/feed/1/purge"},
+		{http.MethodPost, "/sync"},
+		{http.MethodPost, "/sync/1"},
+		{http.MethodGet, "/news-list?id=1"},
+		{http.MethodGet, "/news?feedId=1&id=x"},
+		{http.MethodGet, "/previous-news?feedId=1&newsId=x"},
+		{http.MethodGet, "/mark-read?feedId=1"},
+	}
+	for name, header := range authHeaders {
+		for _, ep := range endpoints {
+			code, body := doRawWithAuth(t, ep.method, ep.path, nil, header)
+			if code != http.StatusUnauthorized {
+				t.Errorf("%s %s with %s: status %d, want 401 (body %s)", ep.method, ep.path, name, code, body)
+			}
+		}
+	}
+}
+
+// TestPublicEndpoints_NoAuth verifies ping, login and register stay reachable
+// without a token.
+func TestPublicEndpoints_NoAuth(t *testing.T) {
+	resetState(t)
+
+	if code, _ := doRawWithAuth(t, http.MethodGet, "/ping", nil, ""); code != http.StatusOK {
+		t.Errorf("GET /ping without token: status %d, want 200", code)
+	}
+	creds := map[string]string{"name": "e2e_public", "password": "pw"}
+	if code, _ := doRawWithAuth(t, http.MethodPost, "/register", creds, ""); code == http.StatusUnauthorized {
+		t.Error("POST /register without token was rejected with 401")
+	}
+	if code, _ := doRawWithAuth(t, http.MethodPost, "/login", creds, ""); code == http.StatusUnauthorized {
+		t.Error("POST /login without token was rejected with 401")
+	}
 }
 
 // apiResponse mirrors the envelope returned by response.ShowData / ShowError.
@@ -484,6 +578,170 @@ func TestFeedManagementFlow(t *testing.T) {
 	code, _ = doRaw(t, http.MethodDelete, "/feed/"+id+"/purge", nil)
 	if code != http.StatusNotFound {
 		t.Errorf("purge of missing feed: status %d, want 404", code)
+	}
+}
+
+// TestPreviousAndMissingArticles covers the edge cases that used to panic or
+// return the wrong article: no previous article, unknown ids, GC'd articles,
+// and malformed feed ids.
+func TestPreviousAndMissingArticles(t *testing.T) {
+	resetState(t)
+	seedArticle(5, "p1", "First", 100)
+	seedArticle(5, "p2", "Second", 200)
+
+	code, body := doRaw(t, http.MethodGet, "/previous-news?feedId=5&newsId=p2", nil)
+	if code != http.StatusOK {
+		t.Fatalf("previous of p2: status %d, body %s", code, body)
+	}
+	var prev articleItem
+	json.Unmarshal(body, &prev)
+	if prev.Id != "p1" || prev.NextId != "p2" {
+		t.Errorf("previous of p2 = %+v, want p1 with next p2", prev)
+	}
+
+	cases := []struct {
+		name, path string
+		want       int
+	}{
+		{"previous of first article", "/previous-news?feedId=5&newsId=p1", http.StatusNotFound},
+		{"previous of unknown article", "/previous-news?feedId=5&newsId=nope", http.StatusNotFound},
+		{"previous in empty feed", "/previous-news?feedId=6&newsId=p1", http.StatusNotFound},
+		{"previous with bad feedId", "/previous-news?feedId=abc&newsId=p2", http.StatusBadRequest},
+		{"unknown article", "/news?feedId=5&id=nope", http.StatusNotFound},
+		{"article with bad feedId", "/news?feedId=abc&id=p1", http.StatusBadRequest},
+	}
+	for _, tc := range cases {
+		if code, body := doRaw(t, http.MethodGet, tc.path, nil); code != tc.want {
+			t.Errorf("%s: status %d, want %d (body %s)", tc.name, code, tc.want, body)
+		}
+	}
+
+	// An article still in the index but whose hash was removed (GC race).
+	miniRedis.Del("news:p1")
+	if code, body := doRaw(t, http.MethodGet, "/news?feedId=5&id=p1", nil); code != http.StatusNotFound {
+		t.Errorf("article with missing hash: status %d, want 404 (body %s)", code, body)
+	}
+}
+
+// feedIds returns the ids in GET /feeds/detail for one user.
+func feedIdsOf(t *testing.T, userId string) map[int64]bool {
+	t.Helper()
+	code, body := doRawAs(t, userId, http.MethodGet, "/feeds/detail", nil)
+	if code != http.StatusOK {
+		t.Fatalf("GET /feeds/detail as %s: status %d", userId, code)
+	}
+	var feeds []feedItem
+	if err := json.Unmarshal(body, &feeds); err != nil {
+		t.Fatalf("GET /feeds/detail unmarshal: %v (%s)", err, body)
+	}
+	out := map[int64]bool{}
+	for _, f := range feeds {
+		out[f.Id] = true
+	}
+	return out
+}
+
+// unreadOf returns the "- N" unread suffix of one feed in GET /feeds for a user.
+func unreadOf(t *testing.T, userId string, feedID int64) string {
+	t.Helper()
+	_, body := doRawAs(t, userId, http.MethodGet, "/feeds", nil)
+	var feeds []feedItem
+	json.Unmarshal(body, &feeds)
+	for _, f := range feeds {
+		if f.Id == feedID {
+			return f.Title[strings.LastIndex(f.Title, " - ")+3:]
+		}
+	}
+	t.Fatalf("feed %d not in /feeds for %s: %s", feedID, userId, body)
+	return ""
+}
+
+func addFeedAs(t *testing.T, userId, url, title string) int64 {
+	t.Helper()
+	code, body := doRawAs(t, userId, http.MethodPost, "/feed", map[string]string{"url": url, "title": title})
+	if code != http.StatusCreated {
+		t.Fatalf("POST /feed as %s: status %d, body %s", userId, code, body)
+	}
+	var f feedItem
+	json.Unmarshal(body, &f)
+	return f.Id
+}
+
+// TestMultiUserIsolation checks that subscriptions and read state are per user
+// while feeds and their articles are shared.
+func TestMultiUserIsolation(t *testing.T) {
+	resetState(t)
+
+	shared := addFeedAs(t, testUserAlice, "https://example.com/shared", "Shared")
+	aliceOnly := addFeedAs(t, testUserAlice, "https://example.com/alice", "Alice only")
+	if again := addFeedAs(t, testUserBob, "https://example.com/shared", "Shared"); again != shared {
+		t.Fatalf("same URL got feed id %d for bob, want shared id %d", again, shared)
+	}
+	sid := strconv.FormatInt(shared, 10)
+	seedArticle(shared, "s1", "One", 100)
+	seedArticle(shared, "s2", "Two", 200)
+
+	// Subscriptions are per user.
+	if got := feedIdsOf(t, testUserBob); len(got) != 1 || !got[shared] {
+		t.Errorf("bob's feeds = %v, want only the shared feed %d", got, shared)
+	}
+	if got := feedIdsOf(t, testUserAlice); len(got) != 2 || !got[aliceOnly] {
+		t.Errorf("alice's feeds = %v, want shared + alice-only", got)
+	}
+
+	// Read state is per user.
+	doRawAs(t, testUserAlice, http.MethodGet, "/news?feedId="+sid+"&id=s1", nil)
+	if got := unreadOf(t, testUserAlice, shared); got != "1" {
+		t.Errorf("alice unread after reading s1 = %s, want 1", got)
+	}
+	if got := unreadOf(t, testUserBob, shared); got != "2" {
+		t.Errorf("bob unread after alice read s1 = %s, want 2", got)
+	}
+	doRawAs(t, testUserBob, http.MethodGet, "/mark-read?feedId="+sid, nil)
+	if got := unreadOf(t, testUserAlice, shared); got != "1" {
+		t.Errorf("alice unread after bob marked all read = %s, want 1", got)
+	}
+
+	// Another user's feed cannot be edited, purged, or synced.
+	aid := strconv.FormatInt(aliceOnly, 10)
+	if code, _ := doRawAs(t, testUserBob, http.MethodPut, "/feed/"+aid, map[string]string{"url": "https://example.com/x", "title": "X"}); code != http.StatusNotFound {
+		t.Errorf("bob editing alice's feed: status %d, want 404", code)
+	}
+	if code, _ := doRawAs(t, testUserBob, http.MethodDelete, "/feed/"+aid+"/purge", nil); code != http.StatusNotFound {
+		t.Errorf("bob purging alice's feed: status %d, want 404", code)
+	}
+	if code, _ := doRawAs(t, testUserBob, http.MethodPost, "/sync/"+aid, nil); code != http.StatusNotFound {
+		t.Errorf("bob syncing alice's feed: status %d, want 404", code)
+	}
+
+	// A shared feed cannot be edited by one subscriber.
+	if code, _ := doRawAs(t, testUserAlice, http.MethodPut, "/feed/"+sid, map[string]string{"url": "https://example.com/shared2", "title": "S"}); code != http.StatusConflict {
+		t.Errorf("editing a shared feed: status %d, want 409", code)
+	}
+
+	// Deleting a shared feed only removes it for that user.
+	if code, body := doRawAs(t, testUserAlice, http.MethodDelete, "/feed/"+sid+"/purge", nil); code != http.StatusNoContent {
+		t.Fatalf("alice deleting shared feed: status %d, body %s", code, body)
+	}
+	if got := feedIdsOf(t, testUserAlice); got[shared] {
+		t.Error("shared feed still in alice's list after she deleted it")
+	}
+	if got := feedIdsOf(t, testUserBob); !got[shared] {
+		t.Error("shared feed disappeared from bob's list")
+	}
+	if !miniRedis.Exists("news:s1") || list.Count(int(shared)) != 2 {
+		t.Error("articles of a still-subscribed feed were purged")
+	}
+	if miniRedis.Exists("read_mark:" + testUserAlice + ":" + sid) {
+		t.Error("alice's read marks for the feed were not cleared")
+	}
+
+	// The last subscriber's delete purges the feed and its articles.
+	if code, body := doRawAs(t, testUserBob, http.MethodDelete, "/feed/"+sid+"/purge", nil); code != http.StatusNoContent {
+		t.Fatalf("bob deleting now-unshared feed: status %d, body %s", code, body)
+	}
+	if miniRedis.Exists("news:s1") || list.Count(int(shared)) != 0 {
+		t.Error("articles of an unsubscribed feed were not purged")
 	}
 }
 

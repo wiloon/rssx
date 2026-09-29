@@ -4,30 +4,58 @@
 **Scope:** `rssx-api` (Go backend) and `rssx-ui` (Vue 3 frontend), full read of the
 routing layer, auth utilities, feed/news handlers, RSS sync pipeline, Redis
 storage helpers, and the reading pane.
-**Status:** findings recorded, remediation deferred.
+**Status:** partially remediated (2026-09-29); see the Status column below.
 
 This is a findings register, not a decision record. Each finding has a stable ID
 so a later task spec (`rssx-api/docs/tasks/task-NNN-*.md`) can reference it.
-Nothing here has been fixed yet.
+The finding bodies describe the code as it was on 2026-09-16.
 
 ---
 
 ## Summary
 
-| ID | Severity | Area | Finding |
-| --- | --- | --- | --- |
-| [SEC-001](#sec-001--no-authentication-on-any-endpoint) | Critical | Backend / auth | No auth middleware; every endpoint is public |
-| [SEC-002](#sec-002--all-users-share-one-hardcoded-account) | Critical | Backend / tenancy | Handlers hardcode `user.DefaultId = "0"` |
-| [SEC-003](#sec-003--jwt-signing-key-committed-to-git-and-empty-in-the-container) | Critical | Backend / auth | Key is in version control; container default is empty |
-| [SEC-004](#sec-004--xss-via-unsanitised-feed-html) | High | Frontend | `v-html` renders third-party feed HTML |
-| [SEC-005](#sec-005--jwt-stored-in-localstorage) | Medium | Frontend | Token readable by any injected script |
-| [BUG-001](#bug-001--rss-sync-can-stall-permanently) | High | Backend / sync | No HTTP timeout, blocking pool of 2, leaked pools |
-| [SEC-006](#sec-006--tls-verification-disabled-process-wide) | High | Backend / sync | Mutates global `http.DefaultTransport` |
-| [BUG-002](#bug-002--nil-pool-panic-crashes-the-process) | High | Backend / sync | `ants.NewPoolWithFunc` error discarded |
-| [BUG-003](#bug-003--index-out-of-range-in-previousarticle) | Medium | Backend | `newsIds[0]` without a length check |
-| [BUG-004](#bug-004--nil-type-assertions-after-redis-errors) | Medium | Backend | Error logged, execution continues onto `.([]byte)` |
-| [BUG-005](#bug-005--userfeed-has-no-unique-constraint) | Medium | Backend / schema | Duplicate subscriptions possible |
-| [BUG-006](#bug-006--logerror-used-with-a-format-string) | Low | Backend | `%v` printed literally |
+| ID | Severity | Area | Finding | Status |
+| --- | --- | --- | --- | --- |
+| [SEC-001](#sec-001--no-authentication-on-any-endpoint) | Critical | Backend / auth | No auth middleware; every endpoint is public | Fixed 2026-09-29 |
+| [SEC-002](#sec-002--all-users-share-one-hardcoded-account) | Critical | Backend / tenancy | Handlers hardcode `user.DefaultId = "0"` | Fixed 2026-09-29 |
+| [SEC-003](#sec-003--jwt-signing-key-committed-to-git-and-empty-in-the-container) | Critical | Backend / auth | Key is in version control; container default is empty | Partial — empty key now refused; rotation pending |
+| [SEC-004](#sec-004--xss-via-unsanitised-feed-html) | High | Frontend | `v-html` renders third-party feed HTML | Fixed 2026-09-29 |
+| [SEC-005](#sec-005--jwt-stored-in-localstorage) | Medium | Frontend | Token readable by any injected script | Open (mitigated by SEC-004 fix) |
+| [BUG-001](#bug-001--rss-sync-can-stall-permanently) | High | Backend / sync | No HTTP timeout, blocking pool of 2, leaked pools | Fixed 2026-09-29 |
+| [SEC-006](#sec-006--tls-verification-disabled-process-wide) | High | Backend / sync | Mutates global `http.DefaultTransport` | Fixed 2026-09-29 (scoped to feed client) |
+| [BUG-002](#bug-002--nil-pool-panic-crashes-the-process) | High | Backend / sync | `ants.NewPoolWithFunc` error discarded | Fixed 2026-09-29 |
+| [BUG-003](#bug-003--index-out-of-range-in-previousarticle) | Medium | Backend | `newsIds[0]` without a length check | Fixed 2026-09-29 |
+| [BUG-004](#bug-004--nil-type-assertions-after-redis-errors) | Medium | Backend | Error logged, execution continues onto `.([]byte)` | Fixed 2026-09-29 |
+| [BUG-005](#bug-005--userfeed-has-no-unique-constraint) | Medium | Backend / schema | Duplicate subscriptions possible | Fixed 2026-09-29 |
+| [BUG-006](#bug-006--logerror-used-with-a-format-string) | Low | Backend | `%v` printed literally | Fixed 2026-09-29 |
+| [BUG-007](#bug-007--expired-articles-are-re-ingested-as-unread) | Medium | Backend / sync | GC'd articles come back as unread on the next sync | Fixed 2026-09-29 |
+
+### Remediation notes (2026-09-29)
+
+- **SEC-001:** `jwt.RequireAuth()` guards every route except `/ping`, `/login`,
+  `/register`; the UI attaches the bearer token and redirects to login on 401.
+- **SEC-002:** handlers take the user id that `RequireAuth` puts in the gin
+  context (`jwt.UserIdFromContext`). Feeds and articles stay shared (one row per
+  URL); subscriptions (`user_feeds`) and read state (`read_index:<user>:<feed>`,
+  `read_mark:<user>:<feed>`) are per user. Editing a feed with other subscribers
+  returns 409; deleting it only unsubscribes the caller and clears their read
+  state, and the last subscriber's delete purges it. Background sync and GC cover
+  every feed with at least one subscriber. On startup `legacy.MigrateLegacyUserData`
+  moves user `"0"` data to `rssx.legacy-owner` (env `RSSX_LEGACY_OWNER`), or to
+  the only registered user when unset.
+- **SEC-003:** `ParseToken` rejects all tokens and the server refuses to start when
+  `rssx.security-key` is empty. The committed key still has to be rotated via
+  `RSSX_SECURITY_KEY` and removed from the config files.
+- **SEC-004:** feed HTML goes through DOMPurify (`rssx-ui/src/utils/sanitize.ts`)
+  before `v-html`; content links open in a new tab with `noopener noreferrer`.
+- **SEC-006:** verification is still skipped, but only on the dedicated feed
+  client, because homelab feeds use a private CA the container does not trust.
+- **Feed parsing:** `encoding/xml` on an RSS 2.0 struct was replaced by
+  `github.com/mmcdole/gofeed`, so Atom and JSON Feed now sync too; `content:encoded`
+  / Atom `<content>` is preferred over the summary, and entries dated only by
+  `<updated>` still honour the retention window.
+- **BUG-005:** unique index `idx_user_feeds_user_feed`; existing duplicates are
+  removed before `AutoMigrate`.
 
 ---
 
@@ -63,6 +91,10 @@ unfinished item rather than a regression.
 [`task-002`](../../rssx-api/docs/tasks/task-002-amazon-cognito-auth.md) (Cognito, P2,
 Pending) is the planned replacement. The gap is that the service shipped publicly
 before that task landed.
+
+**Update 2026-09-29:** task-002 is superseded. Local password auth plus the
+`RequireAuth` middleware is the current model; Clerk (shared with ENX) is the
+upgrade path — see [`docs/ROADMAP.md`](../ROADMAP.md#authentication-local-password-now-clerk-later).
 
 ---
 
@@ -365,6 +397,23 @@ when a feed changes shape.
 
 ---
 
+### BUG-007 — Expired articles are re-ingested as unread
+
+**Added:** 2026-09-29 · **Severity:** Medium
+
+**Where:** [`rss/sync.go`](../../rssx-api/rss/sync.go) · [`rss/gc.go`](../../rssx-api/rss/gc.go) ·
+[`news/article.go`](../../rssx-api/news/article.go)
+
+Sync decides whether an item is new by checking its id in the `feed_news:<id>`
+index (`IsExistInStorage`). GC removes entries older than `news.expire-time`
+(default 30 days) from that same index. A low-traffic feed that still lists a
+30-day-old item therefore gets it re-added — as unread — on the next sync after GC.
+
+**Fix:** sync skips items whose `<pubDate>` is older than the retention cutoff.
+Items without a parseable date keep the old behaviour.
+
+---
+
 ## Suggested remediation order
 
 Sequencing reflects dependency and effort rather than raw severity.
@@ -376,7 +425,9 @@ Sequencing reflects dependency and effort rather than raw severity.
 3. **SEC-001 + SEC-002** — the real work. Middleware plus threading a user ID
    through three packages. Overlaps heavily with
    [`task-002`](../../rssx-api/docs/tasks/task-002-amazon-cognito-auth.md); decide whether
-   to land an interim local-JWT middleware or wait for Cognito.
+   to land an interim local-JWT middleware or wait for Cognito. *(Decided
+   2026-09-29: local-JWT middleware landed; Clerk replaces Cognito as the later
+   upgrade — [`docs/ROADMAP.md`](../ROADMAP.md).)*
 4. **SEC-004 + SEC-005** — sanitise feed HTML, then revisit token storage.
 5. **BUG-003 / BUG-004 / BUG-005** — defensive fixes; fold into whichever task
    touches those files next.

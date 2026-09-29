@@ -1,8 +1,9 @@
 package rss
 
 import (
+	"bytes"
 	"crypto/tls"
-	"encoding/xml"
+	"github.com/mmcdole/gofeed"
 	"github.com/panjf2000/ants/v2"
 	"io"
 	"net/http"
@@ -28,26 +29,43 @@ func Sync() {
 }
 
 func syncFeeds() {
-	p, _ := ants.NewPoolWithFunc(2, syncOneFeed)
-	feedList := feeds.FindUserFeeds("0")
+	p, err := ants.NewPoolWithFunc(2, syncOneFeed)
+	if err != nil {
+		log.Errorf("failed to create sync pool: %v", err)
+		return
+	}
+	defer p.Release()
+	feedList := feeds.FindSubscribedFeeds()
 	log.Debugf("user feed list: %v", len(*feedList))
 	for _, oneFeed := range *feedList {
 		log.Debugf("invoke ant pool, feed id: %d", oneFeed.Id)
 		err := p.Invoke(oneFeed)
 		if err != nil {
-			log.Error("failed to invoke feed sync")
+			log.Errorf("failed to invoke feed sync for feed %d: %v", oneFeed.Id, err)
 			return
 		}
 	}
-	p.Release()
+}
+
+// feedFetchTimeout bounds one feed download end to end; without it a server
+// that never answers would pin a pool worker and stall every later sync tick.
+const feedFetchTimeout = 30 * time.Second
+
+// feedClient is used only for fetching feeds. Certificate verification is
+// skipped because homelab feeds (e.g. rsshub.wiloon.lab) use a private CA the
+// container does not trust; the setting stays scoped to this client.
+var feedClient = newFeedClient()
+
+func newFeedClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	return &http.Client{Transport: transport, Timeout: feedFetchTimeout}
 }
 
 func syncOneFeed(data interface{}) {
 	oneFeed := data.(feed.Feed)
 	log.Infof("sync feed, id: %d, url: %s", oneFeed.Id, oneFeed.Url)
-	// insecure https
-	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	client := &http.Client{}
+	client := feedClient
 	request, err := http.NewRequest("GET", oneFeed.Url, nil)
 	if err != nil {
 		log.Errorf("failed to sync feed: %v, err: %v", oneFeed, err)
@@ -68,27 +86,40 @@ func syncOneFeed(data interface{}) {
 		}
 	}(result.Body)
 
-	var remoteFeedBody []byte
-	if result.StatusCode == http.StatusOK {
-		remoteFeedBody, _ = io.ReadAll(result.Body)
+	if result.StatusCode != http.StatusOK {
+		log.Errorf("failed to sync feed %d (%s): unexpected status %d", oneFeed.Id, oneFeed.Url, result.StatusCode)
+		return
 	}
-
-	rss := Rss{}
-	err = xml.Unmarshal(remoteFeedBody, &rss)
+	remoteFeedBody, err := io.ReadAll(result.Body)
 	if err != nil {
-		log.Error("failed to unmarshal: %v", err)
+		log.Errorf("failed to read feed %d (%s): %v", oneFeed.Id, oneFeed.Url, err)
 		return
 	}
 
-	for i, rssItem := range rss.Chan.Items {
-		// compare and save
-		url := rssItem.Link
-		guid := rssItem.Guid
+	parsed, err := gofeed.NewParser().Parse(bytes.NewReader(remoteFeedBody))
+	if err != nil {
+		log.Errorf("failed to parse feed %d (%s): %v", oneFeed.Id, oneFeed.Url, err)
+		return
+	}
 
-		log.Debugf("index:%v, title:%v, guid: %v", i, rssItem.Title, guid)
+	cutoff := retentionCutoff()
+	for i, item := range parsed.Items {
+		guid := item.GUID
+		log.Debugf("index:%v, title:%v, guid: %v", i, item.Title, guid)
 
-		if strings.EqualFold(guid, "") {
-			guid = rssItem.Link
+		// GC drops articles older than the retention window from the index, so
+		// the existence check below would treat them as new on the next sync.
+		if published := itemTime(item); published != nil && published.Before(cutoff) {
+			log.Debugf("skip expired item, feed id: %d, guid: %v, published: %v", oneFeed.Id, guid, published)
+			continue
+		}
+
+		if guid == "" {
+			guid = item.Link
+		}
+		if guid == "" {
+			log.Debugf("skip item without guid or link, feed id: %d, title: %v", oneFeed.Id, item.Title)
+			continue
 		}
 
 		newsList := list.NewList(0, oneFeed)
@@ -107,12 +138,37 @@ func syncOneFeed(data interface{}) {
 				FeedId:      oneFeed.Id,
 				Guid:        guid,
 				Score:       score,
-				Title:       rssItem.Title,
-				Description: rssItem.Description,
-				Url:         url,
-				PubDate:     rssItem.PubDate,
+				Title:       item.Title,
+				Description: itemBody(item),
+				Url:         item.Link,
+				PubDate:     itemDateText(item),
 			}
 			oneNews.Save()
 		}
 	}
+}
+
+// itemTime is when the item was published, falling back to its last update
+// (Atom entries often carry only <updated>); nil if the feed gave neither.
+func itemTime(item *gofeed.Item) *time.Time {
+	if item.PublishedParsed != nil {
+		return item.PublishedParsed
+	}
+	return item.UpdatedParsed
+}
+
+func itemDateText(item *gofeed.Item) string {
+	if item.Published != "" {
+		return item.Published
+	}
+	return item.Updated
+}
+
+// itemBody prefers the full content (content:encoded, Atom <content>) over the
+// summary (<description>, Atom <summary>).
+func itemBody(item *gofeed.Item) string {
+	if strings.TrimSpace(item.Content) != "" {
+		return item.Content
+	}
+	return item.Description
 }

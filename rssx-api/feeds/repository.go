@@ -10,6 +10,10 @@ import (
 // another feed (the feeds.url column is unique).
 var ErrURLConflict = errors.New("feed url already exists")
 
+// ErrAlreadySubscribed is returned by Subscribe when the subscription exists
+// (user_feeds has a unique index on user_id, feed_id).
+var ErrAlreadySubscribed = errors.New("already subscribed")
+
 // FeedRepository abstracts data access for feed subscriptions.
 type FeedRepository interface {
 	// FindByUserID returns all feeds subscribed by the given user.
@@ -28,7 +32,8 @@ type FeedRepository interface {
 	Subscribers(feedID int64) ([]string, error)
 	// IsSubscribed reports whether the user is already subscribed to feedID.
 	IsSubscribed(userID string, feedID int64) (bool, error)
-	// Subscribe creates a subscription for the user to feedID.
+	// Subscribe creates a subscription for the user to feedID. Returns
+	// ErrAlreadySubscribed when it already exists.
 	Subscribe(userID string, feedID int64) error
 	// Unsubscribe removes the user's subscription. Returns false when not found.
 	Unsubscribe(userID string, feedID int64) (bool, error)

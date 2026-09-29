@@ -1,9 +1,11 @@
 package news
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/gomodule/redigo/redis"
 	"rssx/storage/redisx"
-	"rssx/user"
 	log "rssx/utils/logger"
 	"strconv"
 )
@@ -65,9 +67,15 @@ func (n *News) Save() {
 // read mark, redis set, value=news id
 const newsReadMark string = "read_mark:"
 
+// ReadMarkKey is the Redis set of articles one user has read out of order in
+// one feed.
+func ReadMarkKey(userId string, feedId int64) string {
+	return newsReadMark + userId + ":" + strconv.FormatInt(feedId, 10)
+}
+
 func (n *News) IsRead(userId string) bool {
 	read := false
-	readMarkKey := newsReadMark + userId + ":" + strconv.Itoa(int(n.FeedId))
+	readMarkKey := ReadMarkKey(userId, n.FeedId)
 	log.Debugf("check news is read, read flag key: %v, news id: %v", readMarkKey, n.Id)
 	r, _ := redisx.Exec("SISMEMBER", readMarkKey, n.Id)
 	if r != nil && r.(int64) == 1 {
@@ -77,9 +85,9 @@ func (n *News) IsRead(userId string) bool {
 	return read
 }
 
-func (n *News) MarkRead(userId int) {
-	_, _ = redisx.Exec("SADD", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(n.FeedId)), n.Id)
-	log.Debugf("mark news as read, news id: %v", n.Id)
+func (n *News) MarkRead(userId string) {
+	_, _ = redisx.Exec("SADD", ReadMarkKey(userId, n.FeedId), n.Id)
+	log.Debugf("mark news as read, user id: %v, news id: %v", userId, n.Id)
 }
 
 const newsKeyPrefix string = "news:"
@@ -90,27 +98,35 @@ func (n *News) LoadTitle() {
 		n.Title = string(result[0].([]byte))
 	}
 }
-func (n *News) LoadReadFlag() {
-	n.ReadFlag = n.IsRead(user.DefaultId)
-	log.Debugf("read mark, news id: %v, title: %v", n.Id, n.Title)
-}
-func (n *News) Load() {
-	result, err := redis.Values(redisx.Exec("HMGET", newsKeyPrefix+n.Id, Title, Url, Description, Score, PubDate))
+
+// ErrNewsNotFound is returned by Load when the article hash does not exist,
+// e.g. it was removed by GC or the id is unknown.
+var ErrNewsNotFound = errors.New("news not found")
+
+// Load fills the article's fields from its Redis hash.
+func (n *News) Load() error {
+	fields, err := redis.Values(redisx.Exec("HMGET", newsKeyPrefix+n.Id, Title, Url, Description, Score, PubDate))
 	if err != nil {
-		log.Info(err.Error())
+		return fmt.Errorf("load news %s: %w", n.Id, err)
+	}
+	if len(fields) != 5 || fields[0] == nil {
+		return ErrNewsNotFound
+	}
+	values, err := redis.Strings(fields, nil)
+	if err != nil {
+		return fmt.Errorf("load news %s: %w", n.Id, err)
 	}
 
-	n.Title = string(result[0].([]byte))
-	n.Url = string(result[1].([]byte))
-	n.Description = string(result[2].([]byte))
-	score, _ := strconv.Atoi(string(result[3].([]byte)))
-	n.Score = int64(score)
-	n.PubDate = string(result[4].([]byte))
-
+	n.Title = values[0]
+	n.Url = values[1]
+	n.Description = values[2]
+	n.Score, _ = strconv.ParseInt(values[3], 10, 64)
+	n.PubDate = values[4]
+	return nil
 }
 
-func DelReadMark(userId, feedId int) {
-	_, _ = redisx.Exec("DEL", newsReadMark+strconv.Itoa(userId)+":"+strconv.Itoa(int(feedId)))
+func DelReadMark(userId string, feedId int) {
+	_, _ = redisx.Exec("DEL", ReadMarkKey(userId, int64(feedId)))
 }
 
 // LoadListForFeed loads titles and read flags for a page of news in one feed
@@ -123,7 +139,7 @@ func LoadListForFeed(feedId int64, userId string, ids []string) []News {
 
 	titles := make([]string, len(ids))
 	readFlags := make([]bool, len(ids))
-	readMarkKey := newsReadMark + userId + ":" + strconv.Itoa(int(feedId))
+	readMarkKey := ReadMarkKey(userId, feedId)
 
 	err := redisx.WithConn(func(conn redis.Conn) error {
 		for _, id := range ids {

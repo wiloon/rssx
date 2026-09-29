@@ -117,24 +117,22 @@ func GetNewsIdListByScore(key string, scoreStart, scoreEnd int64) []string {
 
 func GetScoreByRank(key string, rank int64) int64 {
 	log.Debugf("get score by rank, rank: %v", rank)
-	result, err := Exec("ZRANGE", key, rank, rank)
+	members, err := redis.Strings(Exec("ZRANGE", key, rank, rank))
 	if err != nil {
-		log.Errorf("failed to get news by rank: %v", err)
+		log.Errorf("failed to get news by rank, key: %v, rank: %v, err: %v", key, rank, err)
+		return 0
 	}
-	foo := result.([]interface{})
-	var scoreInt int64
-	if len(foo) > 0 {
-		bar := foo[0].([]byte)
-		member := string(bar)
-		log.Debugf("rank: %v, member: %v", rank, member)
-		t, _ := Exec("ZSCORE", key, member)
-		score := t.([]byte)
-		scoreStr := string(score)
-		scoreInt, _ = strconv.ParseInt(scoreStr, 10, 64)
-		log.Debugf("get score by rank, rank: %v, score: %v ", rank, scoreInt)
+	if len(members) == 0 {
+		return 0
 	}
-
-	return scoreInt
+	log.Debugf("rank: %v, member: %v", rank, members[0])
+	score, err := redis.Int64(Exec("ZSCORE", key, members[0]))
+	if err != nil {
+		log.Errorf("failed to get score, key: %v, member: %v, err: %v", key, members[0], err)
+		return 0
+	}
+	log.Debugf("get score by rank, rank: %v, score: %v ", rank, score)
+	return score
 }
 
 func DeleteNews(newsId string) {

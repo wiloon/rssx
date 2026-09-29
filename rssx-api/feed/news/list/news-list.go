@@ -1,6 +1,8 @@
 package list
 
 import (
+	"errors"
+	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -9,7 +11,7 @@ import (
 	"rssx/feed"
 	"rssx/news"
 	"rssx/storage/redisx"
-	"rssx/user"
+	"rssx/utils/jwt"
 	log "rssx/utils/logger"
 )
 
@@ -64,13 +66,23 @@ func PurgeFeed(feedId int, subscriberIds []string) {
 		log.Errorf("purge feed, failed to drop index %v: %v", feedNewsKey, err)
 	}
 	for _, uid := range subscriberIds {
-		if userId, err := strconv.Atoi(uid); err == nil {
-			news.DelReadMark(userId, feedId)
-		}
-		if _, err := redisx.Exec("DEL", userFeedLatestReadIndex+uid+":"+strconv.Itoa(feedId)); err != nil {
-			log.Errorf("purge feed, failed to drop read index for user %v: %v", uid, err)
-		}
+		ClearReadState(uid, feedId)
 	}
+}
+
+// ClearReadState drops one user's read boundary and out-of-order read marks
+// for one feed, e.g. when the user unsubscribes.
+func ClearReadState(userId string, feedId int) {
+	news.DelReadMark(userId, feedId)
+	if _, err := redisx.Exec("DEL", ReadIndexKey(userId, feedId)); err != nil {
+		log.Errorf("failed to drop read index for user %v, feed %v: %v", userId, feedId, err)
+	}
+}
+
+// ReadIndexKey is the Redis key holding one user's read boundary (a score in
+// feed_news:<feedId>) for one feed.
+func ReadIndexKey(userId string, feedId int) string {
+	return userFeedLatestReadIndex + userId + ":" + strconv.Itoa(feedId)
 }
 
 // FindNewsListByRange 按索引取文章列表
@@ -103,17 +115,11 @@ func FinOneNewsByIndex(index int64, feedId int) string {
 
 // FindNextId 找下一篇文章id
 func FindNextId(feedId int, newsId string) string {
-	var nextNewsId string
 	index := FindIndexById(feedId, newsId)
-	nextIndex := index + 1
-	foo, _ := redisx.Exec("ZRANGE", feedNewsKey(feedId), nextIndex, nextIndex)
-	if len(foo.([]interface{})) > 0 {
-		nextNewsId = string(foo.([]interface{})[0].([]byte))
-
-	} else {
-		nextNewsId = ""
+	if index < 0 {
+		return ""
 	}
-	return nextNewsId
+	return FinOneNewsByIndex(index+1, feedId)
 }
 
 // feed_news:12
@@ -131,7 +137,7 @@ const userFeedLatestReadIndex string = "read_index:"
 // 按score取index
 // redis里保存 score, 取最新的未读索引时时先取score再用score取member,再用member取位置   -_-!!
 func GetLatestReadIndex(userId string, feedId int) int64 {
-	latestReadIndexKey := userFeedLatestReadIndex + userId + ":" + strconv.Itoa(feedId)
+	latestReadIndexKey := ReadIndexKey(userId, feedId)
 	r, err := redisx.Exec("GET", latestReadIndexKey)
 	if err != nil {
 		log.Errorf("get latest read index failed, key: %v, err: %v", latestReadIndexKey, err)
@@ -168,7 +174,7 @@ func FeedUnreadCounts(userId string, feedIds []int) map[int]int64 {
 	err := redisx.WithConn(func(conn redis.Conn) error {
 		for _, fid := range feedIds {
 			_ = conn.Send("ZCARD", NewsListKey(fid))
-			_ = conn.Send("GET", userFeedLatestReadIndex+userId+":"+strconv.Itoa(fid))
+			_ = conn.Send("GET", ReadIndexKey(userId, fid))
 		}
 		if err := conn.Flush(); err != nil {
 			return err
@@ -234,11 +240,11 @@ func FeedUnreadCounts(userId string, feedIds []int) map[int]int64 {
 
 // SetReadIndex 更新已读索引
 // 存score值
-func SetReadIndex(userId, feedId int, index int64) {
+func SetReadIndex(userId string, feedId int, index int64) {
 	log.Debugf("set read index, user id: %v, feed id: %v, index: %v", userId, feedId, index)
 	// get score by rank
 	feedNewsKey := FeedNewsKeyPrefix + strconv.Itoa(feedId)
-	userFeedReadIndexKey := userFeedLatestReadIndex + strconv.Itoa(userId) + ":" + strconv.Itoa(feedId)
+	userFeedReadIndexKey := ReadIndexKey(userId, feedId)
 	score := redisx.GetScoreByRank(feedNewsKey, index)
 
 	if score == 0 {
@@ -281,23 +287,22 @@ func Count(feedId int) int64 {
 }
 
 // LoadNewsListByFeed 按feed取一页
-func LoadNewsListByFeed(feedId int) []news.News {
+func LoadNewsListByFeed(userId string, feedId int) []news.News {
 	var newsList []news.News
 	if feedId == -1 {
 		// find all news for all user feeds
-		//	newsList = data.FindAllNewsForUser(user.DefaultId)
 	} else {
 		// by feed id
-		newsIds := FindNewsListByUserFeed(user.DefaultId, feedId)
-		newsList = news.LoadListForFeed(int64(feedId), user.DefaultId, newsIds)
+		newsIds := FindNewsListByUserFeed(userId, feedId)
+		newsList = news.LoadListForFeed(int64(feedId), userId, newsIds)
 	}
 	log.Debugf("new list size: %v", len(newsList))
 	return newsList
 }
 func MarkWholePageAsRead(c *gin.Context) {
-
+	userId := jwt.UserIdFromContext(c)
 	feedId, _ := strconv.Atoi(c.Query("feedId"))
-	readIndex := GetLatestReadIndex(user.DefaultId, feedId)
+	readIndex := GetLatestReadIndex(userId, feedId)
 	// reset read index
 	newIndex := readIndex + PageSize //新已读=旧值加每页数量
 	count := Count(feedId)
@@ -307,38 +312,85 @@ func MarkWholePageAsRead(c *gin.Context) {
 	log.Infof("mark page as read, feed id: %v,  last read index: %v, new index: %v, list count: %v",
 		feedId, readIndex, newIndex, count)
 
-	SetReadIndex(0, feedId, newIndex) //save
+	SetReadIndex(userId, feedId, newIndex) //save
 	// del read mark set,按feed删除
-	news.DelReadMark(0, feedId)
+	news.DelReadMark(userId, feedId)
 
 	// load next page
-	newsList := LoadNewsListByFeed(feedId)
+	newsList := LoadNewsListByFeed(userId, feedId)
 	c.JSON(200, newsList)
 }
+
+// queryFeedId reads the feedId query param. It writes the 400 response itself
+// and returns ok=false when the value is missing or not an integer.
+func queryFeedId(c *gin.Context) (int, bool) {
+	feedId, err := strconv.Atoi(c.Query("feedId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "feedId must be a valid integer"})
+		return 0, false
+	}
+	return feedId, true
+}
+
+// loadNewsOrAbort loads one article, writing a 404 or 500 response and
+// returning false when it cannot be loaded.
+func loadNewsOrAbort(c *gin.Context, n *news.News) bool {
+	if err := n.Load(); err != nil {
+		if errors.Is(err, news.ErrNewsNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+			return false
+		}
+		log.Errorf("failed to load news %v: %v", n.Id, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "storage error"})
+		return false
+	}
+	return true
+}
+
 func PreviousArticle(c *gin.Context) {
 	currentNewsId := c.Query("newsId")
-	feedId, _ := strconv.Atoi(c.Query("feedId"))
+	feedId, ok := queryFeedId(c)
+	if !ok {
+		return
+	}
 	log.Debugf(" load previous news feed id:%v, news id:%v", feedId, currentNewsId)
 	index := FindIndexById(feedId, currentNewsId)
-	newsIds := FindNewsListByRange(NewsListKey(feedId), index-1, index-1)
-	previousNewsId := newsIds[0]
+	if index < 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+		return
+	}
+	if index == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "no previous article"})
+		return
+	}
+	previousNewsId := FinOneNewsByIndex(index-1, feedId)
+	if previousNewsId == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "no previous article"})
+		return
+	}
 	previousNews := news.New(previousNewsId)
 	previousNews.FeedId = int64(feedId)
-	previousNews.Load()
-	nextNewsId := FindNextId(feedId, previousNewsId)
-	previousNews.NextId = nextNewsId
-	c.JSON(200, previousNews)
+	if !loadNewsOrAbort(c, previousNews) {
+		return
+	}
+	previousNews.NextId = FindNextId(feedId, previousNewsId)
+	c.JSON(http.StatusOK, previousNews)
 }
 
 // LoadArticles load one news
 // 按 id 加载一篇文章
 func LoadArticles(c *gin.Context) {
-	feedId, _ := strconv.Atoi(c.Query("feedId"))
+	feedId, ok := queryFeedId(c)
+	if !ok {
+		return
+	}
 	newsId := c.Query("id")
 
 	n := news.New(newsId)
 	n.FeedId = int64(feedId)
-	n.Load()
+	if !loadNewsOrAbort(c, n) {
+		return
+	}
 	log.Debugf("load one news, feed id:%v, news id:%v, title: %s", feedId, newsId, n.Title)
 
 	nextNewsId := FindNextId(feedId, newsId)
@@ -348,21 +400,22 @@ func LoadArticles(c *gin.Context) {
 
 	// 加载新的一条文章时要维护已读未读的边界 和 不连续的已读记录
 	// 用户当前已读索引
-	currentUserReadIndex := GetLatestReadIndex(user.DefaultId, feedId)
+	userId := jwt.UserIdFromContext(c)
+	currentUserReadIndex := GetLatestReadIndex(userId, feedId)
 	// 当前文章的索引
 	currentNewsIndex := FindIndexById(feedId, newsId)
-	n.MarkRead(0)
+	n.MarkRead(userId)
 	log.Debugf("currentUserReadIndex: %v, currentNewsIndex: %v", currentUserReadIndex, currentNewsIndex)
 
-	nextUnReadIndex := findNextUserUnReadIndex(feedId, currentUserReadIndex)
+	nextUnReadIndex := findNextUserUnReadIndex(userId, feedId, currentUserReadIndex)
 	log.Debugf("currentUserReadIndex: %v, nextUnReadIndex: %v", currentUserReadIndex, nextUnReadIndex)
 	if currentUserReadIndex == nextUnReadIndex {
 		// 已读位置不连续，记录到已读集合
-		n.MarkRead(0)
+		n.MarkRead(userId)
 	} else {
 		//已读文章是连续的，直接维护已读位置边界
 		//更新用户已读索引
-		SetReadIndex(0, feedId, nextUnReadIndex)
+		SetReadIndex(userId, feedId, nextUnReadIndex)
 	}
 	c.JSON(200, n)
 
@@ -372,7 +425,7 @@ func LoadArticles(c *gin.Context) {
 *
 找到用户下一个未读索引
 */
-func findNextUserUnReadIndex(feedId int, currentNewsIndex int64) int64 {
+func findNextUserUnReadIndex(userId string, feedId int, currentNewsIndex int64) int64 {
 	log.Debugf("findNextUserUnReadIndex, feed id: %v, index: %v", feedId, currentNewsIndex)
 	var result int64
 	nextNewsIndex := currentNewsIndex + 1
@@ -383,8 +436,8 @@ func findNextUserUnReadIndex(feedId int, currentNewsIndex int64) int64 {
 	} else {
 		nextNews := news.New(nextNewsId)
 		nextNews.FeedId = int64(feedId)
-		if nextNews.IsRead(user.DefaultId) {
-			result = findNextUserUnReadIndex(feedId, nextNewsIndex)
+		if nextNews.IsRead(userId) {
+			result = findNextUserUnReadIndex(userId, feedId, nextNewsIndex)
 		} else {
 			// 找到一条未读文章，退出
 			result = currentNewsIndex
@@ -399,7 +452,7 @@ func LoadNewsList(c *gin.Context) {
 	feedId, _ := strconv.Atoi(feedIdStr)
 	log.Debugf("load news list by feed id: %v", feedId)
 
-	newsList := LoadNewsListByFeed(feedId)
+	newsList := LoadNewsListByFeed(jwt.UserIdFromContext(c), feedId)
 
 	c.JSON(200, newsList)
 

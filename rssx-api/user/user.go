@@ -10,7 +10,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-const DefaultId = "0"
+// LegacyUserId is the placeholder owner of all subscriptions and read state from
+// before RSSX was multi-user. Only the startup migration (package legacy) may
+// use it; request handlers take the user id from the JWT.
+const LegacyUserId = "0"
 
 type User struct {
 	Id         string
@@ -34,10 +37,12 @@ func (u *User) IsExist() bool {
 	return exist
 }
 
-func (u *User) Register() {
+// Register stores a new user with a fresh UUID. The name column is unique, so a
+// concurrent registration of the same name fails here.
+func (u *User) Register() error {
 	u.CreateTime = utils.CurrentDateString()
 	u.Id = uuid.New().String()
-	common.DB.Create(u)
+	return common.DB.Create(u).Error
 }
 
 func (u *User) Validate() bool {
