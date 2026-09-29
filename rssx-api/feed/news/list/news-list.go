@@ -3,11 +3,13 @@ package list
 import (
 	"errors"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gomodule/redigo/redis"
 
+	"rssx/common"
 	"rssx/feed"
 	"rssx/news"
 	"rssx/storage/redisx"
@@ -17,6 +19,9 @@ import (
 
 const FeedNewsKeyPrefix string = "feed_news:"
 const PageSize int64 = 10
+
+// AllFeedId is the pseudo-feed that aggregates every subscription.
+const AllFeedId = -1
 
 type NewsList struct {
 	userId int
@@ -37,16 +42,48 @@ func (newsList *NewsList) AppendNews(score int64, newsId string) {
 	_, _ = redisx.Exec("ZADD", feedNewsKey, score, newsId)
 }
 
-// FindNewsListByUserFeed 按用户和feed取一页未读文章
-func FindNewsListByUserFeed(userId string, feedId int) []string {
-	var newsList []string
+// ReserveScore returns preferred, or the next free score, so two articles in one
+// feed never share a sort key. A shared score makes the read boundary ambiguous.
+func ReserveScore(feedId int64, newsId string, preferred int64) int64 {
+	if preferred < 1 {
+		preferred = 1
+	}
+	key := NewsListKey(int(feedId))
+	score := preferred
+	for n := 0; n < 10000; n++ {
+		members, err := redis.Strings(redisx.Exec("ZRANGEBYSCORE", key, score, score))
+		if err != nil || !scoreTakenByOther(members, newsId) {
+			return score
+		}
+		score++
+	}
+	return score
+}
 
-	latestReadIndex := GetLatestReadIndex(userId, feedId)
-	key := NewsListKey(feedId)
-	unReadIndexStart := latestReadIndex + 1
-	unReadIndexEnd := unReadIndexStart + PageSize - 1
-	newsList = FindNewsListByRange(key, unReadIndexStart, unReadIndexEnd)
-	log.Debugf("find news list by feed, index start: %v, index end: %v, list size: %v", unReadIndexStart, unReadIndexEnd, len(newsList))
+func scoreTakenByOther(members []string, newsId string) bool {
+	for _, member := range members {
+		if member != newsId {
+			return true
+		}
+	}
+	return false
+}
+
+// scoredArticle is one entry in a feed's index. Higher score means newer.
+type scoredArticle struct {
+	id     string
+	score  int64
+	feedId int
+}
+
+// FindNewsListByUserFeed returns one page of unread articles, newest first.
+func FindNewsListByUserFeed(userId string, feedId int) []string {
+	items := newestUnread(userId, feedId, int(PageSize))
+	newsList := make([]string, len(items))
+	for i, item := range items {
+		newsList[i] = item.id
+	}
+	log.Debugf("find news list by feed, feed id: %v, list size: %v", feedId, len(newsList))
 	return newsList
 }
 
@@ -113,13 +150,24 @@ func FinOneNewsByIndex(index int64, feedId int) string {
 	return ""
 }
 
-// FindNextId 找下一篇文章id
+// FindNextId returns the next newer article (higher score). previous-news uses
+// it as the link back to the article the reader stepped away from.
 func FindNextId(feedId int, newsId string) string {
 	index := FindIndexById(feedId, newsId)
 	if index < 0 {
 		return ""
 	}
 	return FinOneNewsByIndex(index+1, feedId)
+}
+
+// olderID returns the next older article, which is the following row when the
+// list is newest-first.
+func olderID(feedId int, newsId string) string {
+	index := FindIndexById(feedId, newsId)
+	if index <= 0 {
+		return ""
+	}
+	return FinOneNewsByIndex(index-1, feedId)
 }
 
 // feed_news:12
@@ -153,89 +201,259 @@ func GetLatestReadIndex(userId string, feedId int) int64 {
 	return rank
 }
 
-// FeedUnreadCounts 批量计算多个 feed 的未读数量。
-// 用两次 pipeline 往返完成，替代原来每个 feed 最多 4 次的串行往返。
+// FeedUnreadCounts counts unread articles for each feed. An article is unread
+// when its score is above the user's read boundary and its id is not in the
+// per-user read set. The boundary is the legacy "read through this score"
+// watermark; opening or marking a page records ids in the set so newer
+// articles stay visible.
 func FeedUnreadCounts(userId string, feedIds []int) map[int]int64 {
 	counts := make(map[int]int64, len(feedIds))
 	if len(feedIds) == 0 {
 		return counts
 	}
 
-	n := len(feedIds)
-	totals := make([]int64, n)
-	scores := make([]int64, n)
-	haveScore := make([]bool, n)
-	ranks := make([]int64, n)
-	for i := range ranks {
-		ranks[i] = -1 // 没有已读标记
+	type feedReadState struct {
+		articles []scoredArticle
+		boundary int64
+		has      bool
+		marks    map[string]bool
 	}
+	states := make([]feedReadState, len(feedIds))
 
-	// 第一轮：每个 feed 的 ZCARD + GET(已读标记 score)
 	err := redisx.WithConn(func(conn redis.Conn) error {
 		for _, fid := range feedIds {
-			_ = conn.Send("ZCARD", NewsListKey(fid))
+			_ = conn.Send("ZREVRANGE", NewsListKey(fid), 0, -1, "WITHSCORES")
 			_ = conn.Send("GET", ReadIndexKey(userId, fid))
+			_ = conn.Send("SMEMBERS", news.ReadMarkKey(userId, int64(fid)))
 		}
 		if err := conn.Flush(); err != nil {
 			return err
 		}
 		for i := range feedIds {
-			totals[i], _ = redis.Int64(conn.Receive())
+			reply, recvErr := conn.Receive()
+			states[i].articles = scoredFromReply(reply, recvErr)
 			raw, err := redis.Bytes(conn.Receive())
 			if err == nil && len(raw) > 0 {
 				if s, convErr := strconv.ParseInt(string(raw), 10, 64); convErr == nil {
-					scores[i] = s
-					haveScore[i] = true
-					if s == 0 {
-						ranks[i] = 0
-					}
+					states[i].boundary = s
+					states[i].has = true
 				}
 			}
+			members, _ := redis.Strings(conn.Receive())
+			states[i].marks = map[string]bool{}
+			for _, id := range members {
+				states[i].marks[id] = true
+			}
 		}
 		return nil
 	})
 	if err != nil {
-		log.Errorf("feed unread counts, round 1 failed: %v", err)
-		return counts
-	}
-
-	// 第二轮：对有 score 的 feed，用 ZCOUNT 取已读位置之前的数量
-	err = redisx.WithConn(func(conn redis.Conn) error {
-		sent := false
-		for i, fid := range feedIds {
-			if !haveScore[i] || scores[i] == 0 {
-				continue
-			}
-			_ = conn.Send("ZCOUNT", NewsListKey(fid), "-inf", "("+strconv.FormatInt(scores[i], 10))
-			sent = true
-		}
-		if !sent {
-			return nil
-		}
-		if err := conn.Flush(); err != nil {
-			return err
-		}
-		for i := range feedIds {
-			if !haveScore[i] || scores[i] == 0 {
-				continue
-			}
-			ranks[i], _ = redis.Int64(conn.Receive())
-		}
-		return nil
-	})
-	if err != nil {
-		log.Errorf("feed unread counts, round 2 failed: %v", err)
+		log.Errorf("feed unread counts failed: %v", err)
 		return counts
 	}
 
 	for i, fid := range feedIds {
-		unread := totals[i] - ranks[i] - 1
-		if unread < 0 {
-			unread = 0
-		}
-		counts[fid] = unread
+		counts[fid] = countUnread(states[i].articles, states[i].boundary, states[i].has, states[i].marks)
 	}
 	return counts
+}
+
+func countUnread(articles []scoredArticle, boundary int64, hasBoundary bool, marks map[string]bool) int64 {
+	var n int64
+	for _, article := range articles {
+		if hasBoundary && article.score <= boundary {
+			break
+		}
+		if marks[article.id] {
+			continue
+		}
+		n++
+	}
+	return n
+}
+
+func newestUnread(userId string, feedId, limit int) []scoredArticle {
+	articles := feedArticlesNewestFirst(feedId)
+	boundary, hasBoundary := readBoundary(userId, feedId)
+	marks := readMarks(userId, feedId)
+	out := make([]scoredArticle, 0, limit)
+	for _, article := range articles {
+		if hasBoundary && article.score <= boundary {
+			break
+		}
+		if marks[article.id] {
+			continue
+		}
+		article.feedId = feedId
+		out = append(out, article)
+		if limit > 0 && len(out) >= limit {
+			break
+		}
+	}
+	return out
+}
+
+func feedArticlesNewestFirst(feedId int) []scoredArticle {
+	reply, err := redisx.Exec("ZREVRANGE", NewsListKey(feedId), 0, -1, "WITHSCORES")
+	articles := scoredFromReply(reply, err)
+	for i := range articles {
+		articles[i].feedId = feedId
+	}
+	return articles
+}
+
+func scoredFromReply(reply interface{}, err error) []scoredArticle {
+	if err != nil || reply == nil {
+		return nil
+	}
+	parts, err := redis.Strings(reply, nil)
+	if err != nil {
+		return nil
+	}
+	out := make([]scoredArticle, 0, len(parts)/2)
+	for i := 0; i+1 < len(parts); i += 2 {
+		score, convErr := strconv.ParseInt(parts[i+1], 10, 64)
+		if convErr != nil {
+			continue
+		}
+		out = append(out, scoredArticle{id: parts[i], score: score})
+	}
+	return out
+}
+
+func readBoundary(userId string, feedId int) (int64, bool) {
+	reply, err := redisx.Exec("GET", ReadIndexKey(userId, feedId))
+	if err != nil || reply == nil {
+		return 0, false
+	}
+	raw, ok := reply.([]byte)
+	if !ok || len(raw) == 0 {
+		return 0, false
+	}
+	score, err := strconv.ParseInt(string(raw), 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return score, true
+}
+
+func readMarks(userId string, feedId int) map[string]bool {
+	marks := map[string]bool{}
+	reply, err := redisx.Exec("SMEMBERS", news.ReadMarkKey(userId, int64(feedId)))
+	if err != nil || reply == nil {
+		return marks
+	}
+	ids, err := redis.Strings(reply, nil)
+	if err != nil {
+		return marks
+	}
+	for _, id := range ids {
+		marks[id] = true
+	}
+	return marks
+}
+
+func userSubscribed(userId string, feedId int64) (bool, error) {
+	var count int64
+	err := common.DB.Model(&common.UserFeed{}).Where("user_id = ? AND feed_id = ?", userId, feedId).Count(&count).Error
+	return count > 0, err
+}
+
+func subscribedFeedIDs(userId string) ([]int64, error) {
+	var ids []int64
+	err := common.DB.Model(&common.UserFeed{}).Where("user_id = ?", userId).Pluck("feed_id", &ids).Error
+	return ids, err
+}
+
+// isNewer reports whether a should appear before b in a newest-first list.
+func isNewer(a, b scoredArticle) bool {
+	if a.score != b.score {
+		return a.score > b.score
+	}
+	if a.feedId != b.feedId {
+		return a.feedId < b.feedId
+	}
+	return a.id < b.id
+}
+
+func allViewPage(userId string, limit int) ([]scoredArticle, error) {
+	feedIDs, err := subscribedFeedIDs(userId)
+	if err != nil {
+		return nil, err
+	}
+	merged := make([]scoredArticle, 0)
+	for _, feedID := range feedIDs {
+		merged = append(merged, newestUnread(userId, int(feedID), limit)...)
+	}
+	sort.SliceStable(merged, func(i, j int) bool {
+		return isNewer(merged[i], merged[j])
+	})
+	if limit > 0 && len(merged) > limit {
+		merged = merged[:limit]
+	}
+	return merged, nil
+}
+
+func articlesFromScored(userId string, items []scoredArticle) []news.News {
+	if len(items) == 0 {
+		return []news.News{}
+	}
+	byFeed := map[int][]string{}
+	for _, item := range items {
+		byFeed[item.feedId] = append(byFeed[item.feedId], item.id)
+	}
+	loaded := map[string]news.News{}
+	for feedID, ids := range byFeed {
+		for _, article := range news.LoadListForFeed(int64(feedID), userId, ids) {
+			loaded[articleKey(feedID, article.Id)] = article
+		}
+	}
+	out := make([]news.News, 0, len(items))
+	for _, item := range items {
+		article, ok := loaded[articleKey(item.feedId, item.id)]
+		if !ok {
+			continue
+		}
+		out = append(out, article)
+	}
+	return out
+}
+
+func articleKey(feedID int, id string) string {
+	return strconv.Itoa(feedID) + ":" + id
+}
+
+// olderAcrossFeeds is the next older article across every feed the user
+// subscribes to, compared with current.
+func olderAcrossFeeds(userId string, current scoredArticle) (scoredArticle, bool) {
+	feedIDs, err := subscribedFeedIDs(userId)
+	if err != nil {
+		log.Errorf("all view older article, load subscriptions: %v", err)
+		return scoredArticle{}, false
+	}
+	var best scoredArticle
+	found := false
+	for _, feedID := range feedIDs {
+		for _, article := range feedArticlesNewestFirst(int(feedID)) {
+			article.feedId = int(feedID)
+			if article.id == current.id && article.feedId == current.feedId {
+				continue
+			}
+			if isNewer(article, current) || sameArticle(article, current) {
+				continue
+			}
+			if !found || isNewer(article, best) {
+				best = article
+				found = true
+			}
+			break
+		}
+	}
+	return best, found
+}
+
+func sameArticle(a, b scoredArticle) bool {
+	return a.feedId == b.feedId && a.id == b.id
 }
 
 // SetReadIndex 更新已读索引
@@ -286,39 +504,59 @@ func Count(feedId int) int64 {
 	return count
 }
 
-// LoadNewsListByFeed 按feed取一页
+// LoadNewsListByFeed returns one page of unread articles, newest first.
+// feedId -1 aggregates every feed the user subscribes to.
 func LoadNewsListByFeed(userId string, feedId int) []news.News {
 	var newsList []news.News
-	if feedId == -1 {
-		// find all news for all user feeds
+	if feedId == AllFeedId {
+		page, err := allViewPage(userId, int(PageSize))
+		if err != nil {
+			log.Errorf("all view list failed, user %s: %v", userId, err)
+			return []news.News{}
+		}
+		newsList = articlesFromScored(userId, page)
 	} else {
-		// by feed id
 		newsIds := FindNewsListByUserFeed(userId, feedId)
 		newsList = news.LoadListForFeed(int64(feedId), userId, newsIds)
 	}
 	log.Debugf("new list size: %v", len(newsList))
 	return newsList
 }
+
 func MarkWholePageAsRead(c *gin.Context) {
 	userId := jwt.UserIdFromContext(c)
-	feedId, _ := strconv.Atoi(c.Query("feedId"))
-	readIndex := GetLatestReadIndex(userId, feedId)
-	// reset read index
-	newIndex := readIndex + PageSize //新已读=旧值加每页数量
-	count := Count(feedId)
-	if newIndex >= count {
-		newIndex = count - 1
+	feedId, ok := queryFeedId(c)
+	if !ok {
+		return
 	}
-	log.Infof("mark page as read, feed id: %v,  last read index: %v, new index: %v, list count: %v",
-		feedId, readIndex, newIndex, count)
+	if !ensureFeedAccess(c, feedId) {
+		return
+	}
+	markPageRead(userId, feedId)
+	c.JSON(http.StatusOK, LoadNewsListByFeed(userId, feedId))
+}
 
-	SetReadIndex(userId, feedId, newIndex) //save
-	// del read mark set,按feed删除
-	news.DelReadMark(userId, feedId)
-
-	// load next page
-	newsList := LoadNewsListByFeed(userId, feedId)
-	c.JSON(200, newsList)
+// markPageRead records the current newest-unread page as read. It does not
+// move the score boundary: that watermark means "everything this old is read",
+// and advancing it would hide articles the user has not seen yet.
+func markPageRead(userId string, feedId int) {
+	if feedId == AllFeedId {
+		page, err := allViewPage(userId, int(PageSize))
+		if err != nil {
+			log.Errorf("mark all-view page read, user %s: %v", userId, err)
+			return
+		}
+		for _, article := range page {
+			(&news.News{Id: article.id, FeedId: int64(article.feedId)}).MarkRead(userId)
+		}
+		log.Infof("mark page as read, all view, user %s, count %d", userId, len(page))
+		return
+	}
+	ids := FindNewsListByUserFeed(userId, feedId)
+	for _, id := range ids {
+		(&news.News{Id: id, FeedId: int64(feedId)}).MarkRead(userId)
+	}
+	log.Infof("mark page as read, feed id: %v, count: %v", feedId, len(ids))
 }
 
 // queryFeedId reads the feedId query param. It writes the 400 response itself
@@ -353,6 +591,13 @@ func PreviousArticle(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if !ensureFeedAccess(c, feedId) {
+		return
+	}
+	if feedId == AllFeedId {
+		previousAcrossFeeds(c, currentNewsId)
+		return
+	}
 	log.Debugf(" load previous news feed id:%v, news id:%v", feedId, currentNewsId)
 	index := FindIndexById(feedId, currentNewsId)
 	if index < 0 {
@@ -384,76 +629,114 @@ func LoadArticles(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if !ensureFeedAccess(c, feedId) {
+		return
+	}
 	newsId := c.Query("id")
+	if newsId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id is required"})
+		return
+	}
 
 	n := news.New(newsId)
-	n.FeedId = int64(feedId)
 	if !loadNewsOrAbort(c, n) {
 		return
 	}
-	log.Debugf("load one news, feed id:%v, news id:%v, title: %s", feedId, newsId, n.Title)
+	if feedId != AllFeedId && n.FeedId != int64(feedId) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+		return
+	}
+	if feedId == AllFeedId && !ensureFeedAccess(c, int(n.FeedId)) {
+		return
+	}
+	log.Debugf("load one news, feed id:%v, news id:%v, title: %s", n.FeedId, newsId, n.Title)
 
-	nextNewsId := FindNextId(feedId, newsId)
-	n.NextId = nextNewsId
-
-	log.Info("show news:", n.Title, ", next id:", n.NextId)
-
-	// 加载新的一条文章时要维护已读未读的边界 和 不连续的已读记录
-	// 用户当前已读索引
 	userId := jwt.UserIdFromContext(c)
-	currentUserReadIndex := GetLatestReadIndex(userId, feedId)
-	// 当前文章的索引
-	currentNewsIndex := FindIndexById(feedId, newsId)
-	n.MarkRead(userId)
-	log.Debugf("currentUserReadIndex: %v, currentNewsIndex: %v", currentUserReadIndex, currentNewsIndex)
-
-	nextUnReadIndex := findNextUserUnReadIndex(userId, feedId, currentUserReadIndex)
-	log.Debugf("currentUserReadIndex: %v, nextUnReadIndex: %v", currentUserReadIndex, nextUnReadIndex)
-	if currentUserReadIndex == nextUnReadIndex {
-		// 已读位置不连续，记录到已读集合
-		n.MarkRead(userId)
-	} else {
-		//已读文章是连续的，直接维护已读位置边界
-		//更新用户已读索引
-		SetReadIndex(userId, feedId, nextUnReadIndex)
-	}
-	c.JSON(200, n)
-
-}
-
-/*
-*
-找到用户下一个未读索引
-*/
-func findNextUserUnReadIndex(userId string, feedId int, currentNewsIndex int64) int64 {
-	log.Debugf("findNextUserUnReadIndex, feed id: %v, index: %v", feedId, currentNewsIndex)
-	var result int64
-	nextNewsIndex := currentNewsIndex + 1
-	nextNewsId := FinOneNewsByIndex(nextNewsIndex, feedId)
-
-	if nextNewsId == "" {
-		result = currentNewsIndex
-	} else {
-		nextNews := news.New(nextNewsId)
-		nextNews.FeedId = int64(feedId)
-		if nextNews.IsRead(userId) {
-			result = findNextUserUnReadIndex(userId, feedId, nextNewsIndex)
-		} else {
-			// 找到一条未读文章，退出
-			result = currentNewsIndex
+	if feedId == AllFeedId {
+		if older, ok := olderAcrossFeeds(userId, scoredArticle{id: n.Id, score: n.Score, feedId: int(n.FeedId)}); ok {
+			n.NextId = older.id
 		}
+	} else {
+		n.NextId = olderID(feedId, newsId)
 	}
-
-	log.Debugf("findNextUserUnReadIndex, feed id: %v, index: %v, result: %v", feedId, currentNewsIndex, result)
-	return result
+	n.MarkRead(userId)
+	log.Info("show news:", n.Title, ", next id:", n.NextId)
+	c.JSON(http.StatusOK, n)
 }
+
 func LoadNewsList(c *gin.Context) {
-	feedIdStr := c.Query("id")
-	feedId, _ := strconv.Atoi(feedIdStr)
+	feedId, ok := queryListFeedID(c)
+	if !ok {
+		return
+	}
+	if !ensureFeedAccess(c, feedId) {
+		return
+	}
 	log.Debugf("load news list by feed id: %v", feedId)
+	c.JSON(http.StatusOK, LoadNewsListByFeed(jwt.UserIdFromContext(c), feedId))
+}
 
-	newsList := LoadNewsListByFeed(jwt.UserIdFromContext(c), feedId)
+// queryListFeedID reads the id query param used by GET /news-list.
+func queryListFeedID(c *gin.Context) (int, bool) {
+	raw := c.Query("id")
+	if raw == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id must be a valid integer"})
+		return 0, false
+	}
+	feedId, err := strconv.Atoi(raw)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id must be a valid integer"})
+		return 0, false
+	}
+	return feedId, true
+}
 
-	c.JSON(200, newsList)
+// ensureFeedAccess allows the all-view pseudo-feed and rejects feeds the
+// caller does not subscribe to. Missing subscriptions are 404 so feed ids
+// cannot be probed for someone else's articles.
+func ensureFeedAccess(c *gin.Context, feedId int) bool {
+	if feedId == AllFeedId {
+		return true
+	}
+	if feedId <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "feedId must be a valid integer"})
+		return false
+	}
+	ok, err := userSubscribed(jwt.UserIdFromContext(c), int64(feedId))
+	if err != nil {
+		log.Errorf("subscription check failed, feed %d: %v", feedId, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return false
+	}
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "feed not found"})
+		return false
+	}
+	return true
+}
 
+func previousAcrossFeeds(c *gin.Context, currentNewsId string) {
+	if currentNewsId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "newsId is required"})
+		return
+	}
+	current := news.New(currentNewsId)
+	if !loadNewsOrAbort(c, current) {
+		return
+	}
+	if !ensureFeedAccess(c, int(current.FeedId)) {
+		return
+	}
+	userId := jwt.UserIdFromContext(c)
+	older, ok := olderAcrossFeeds(userId, scoredArticle{id: current.Id, score: current.Score, feedId: int(current.FeedId)})
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "no previous article"})
+		return
+	}
+	previous := news.New(older.id)
+	if !loadNewsOrAbort(c, previous) {
+		return
+	}
+	previous.NextId = currentNewsId
+	c.JSON(http.StatusOK, previous)
 }

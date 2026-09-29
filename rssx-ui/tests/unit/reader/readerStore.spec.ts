@@ -75,7 +75,24 @@ describe('reader store — orchestrates the three panes', () => {
     expect(store.state.list.articles.map((a) => a.id)).toEqual(['c', 'b', 'a'])
   })
 
-  it('opens the next article using the nextId carried by the reading pane', async () => {
+  it('opens an All-view article with that article\'s feed id', async () => {
+    const api = fakeApi({
+      listUnread: vi.fn().mockResolvedValue([article('a', { feedId: 7 })]),
+      getArticle: vi.fn().mockResolvedValue({
+        article: article('a', { feedId: 7, read: true }),
+        nextId: ''
+      })
+    })
+    const store = createReaderStore(api)
+    await store.openFeed(-1)
+
+    await store.openArticle('a')
+
+    expect(api.getArticle).toHaveBeenCalledWith(7, 'a')
+    expect(store.state.selectedFeedId).toBe(-1)
+  })
+
+  it('opens the next row in the article list', async () => {
     const api = fakeApi({
       listUnread: vi.fn().mockResolvedValue([article('a'), article('b')]),
       getArticle: vi.fn()

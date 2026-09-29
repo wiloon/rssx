@@ -57,12 +57,14 @@ func (h *Handler) LoadFeedList(c *gin.Context) {
 		feedIds[i] = int(v.Id)
 	}
 	unreadCounts := list.FeedUnreadCounts(userId, feedIds)
-
+	var totalUnread int64
 	for _, v := range userFeeds {
 		unread := unreadCounts[int(v.Id)]
+		totalUnread += unread
 		v.Title = v.Title + " - " + strconv.Itoa(int(unread))
 		feedsList = append(feedsList, v)
 	}
+	feedsList[0].Title = "All - " + strconv.FormatInt(totalUnread, 10)
 	c.JSON(http.StatusOK, feedsList)
 }
 

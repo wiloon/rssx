@@ -24,13 +24,13 @@ type User struct {
 
 func (u *User) getByName() {
 	common.DB.Where("name = ?", u.Name).First(u)
-	logger.Debugf("is exist, user: %v", u)
+	logger.Debugf("user lookup, name: %s, id: %s", u.Name, u.Id)
 }
 func (u *User) IsExist() bool {
 	exist := false
 	tmp := &User{}
 	common.DB.Where("name = ?", u.Name).First(tmp)
-	logger.Debugf("is exist, user: %v", tmp)
+	logger.Debugf("user exists check, name: %s, id: %s", u.Name, tmp.Id)
 	if tmp.Id != "" {
 		exist = true
 	}
@@ -49,7 +49,7 @@ func (u *User) Validate() bool {
 	pass := false
 	tmp := &User{}
 	common.DB.Where("name = ?", u.Name).First(tmp)
-	log.Debugf("user from db, params: %+v", tmp)
+	log.Debugf("user login lookup, name: %s, id: %s", u.Name, tmp.Id)
 
 	if tmp.Password != "" {
 		err := bcrypt.CompareHashAndPassword([]byte(tmp.Password), []byte(u.Password))

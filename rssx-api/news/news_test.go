@@ -87,6 +87,9 @@ func TestNews_SaveAndLoad(t *testing.T) {
 	if got.Score != 1234 {
 		t.Fatalf("Load Score = %d, want 1234", got.Score)
 	}
+	if got.FeedId != 3 {
+		t.Fatalf("Load FeedId = %d, want 3", got.FeedId)
+	}
 }
 
 func TestNews_Load_MissingReturnsNotFound(t *testing.T) {

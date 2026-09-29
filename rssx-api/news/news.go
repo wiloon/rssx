@@ -105,11 +105,11 @@ var ErrNewsNotFound = errors.New("news not found")
 
 // Load fills the article's fields from its Redis hash.
 func (n *News) Load() error {
-	fields, err := redis.Values(redisx.Exec("HMGET", newsKeyPrefix+n.Id, Title, Url, Description, Score, PubDate))
+	fields, err := redis.Values(redisx.Exec("HMGET", newsKeyPrefix+n.Id, Title, Url, Description, Score, PubDate, FeedId))
 	if err != nil {
 		return fmt.Errorf("load news %s: %w", n.Id, err)
 	}
-	if len(fields) != 5 || fields[0] == nil {
+	if len(fields) != 6 || fields[0] == nil {
 		return ErrNewsNotFound
 	}
 	values, err := redis.Strings(fields, nil)
@@ -122,6 +122,9 @@ func (n *News) Load() error {
 	n.Description = values[2]
 	n.Score, _ = strconv.ParseInt(values[3], 10, 64)
 	n.PubDate = values[4]
+	if values[5] != "" {
+		n.FeedId, _ = strconv.ParseInt(values[5], 10, 64)
+	}
 	return nil
 }
 

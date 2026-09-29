@@ -1,6 +1,6 @@
 [rssx]
 rss-sync-auto=true
-security-key="fa6ee430-ebf6-44f2-a18b-64d691cd2dae"
+# JWT signing key is RSSX_SECURITY_KEY. The server refuses to start when it is empty.
 
 [sqlite]
 path="/data/rssx/rssx.db"

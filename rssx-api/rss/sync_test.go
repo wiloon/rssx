@@ -190,6 +190,40 @@ func TestSyncOneFeed_HangingServerTimesOut(t *testing.T) {
 	}
 }
 
+func TestSyncOneFeed_ScoresByPublicationTime(t *testing.T) {
+	miniRedis.FlushAll()
+	older := time.Now().Add(-48 * time.Hour).UTC().Format(time.RFC1123Z)
+	newer := time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC1123Z)
+	same := newer
+	body := fmt.Sprintf(`<rss version="2.0"><channel><title>t</title>
+<item><title>older</title><link>https://example.com/older</link><guid>older</guid><pubDate>%s</pubDate></item>
+<item><title>newer</title><link>https://example.com/newer</link><guid>newer</guid><pubDate>%s</pubDate></item>
+<item><title>same-a</title><link>https://example.com/same-a</link><guid>same-a</guid><pubDate>%s</pubDate></item>
+<item><title>same-b</title><link>https://example.com/same-b</link><guid>same-b</guid><pubDate>%s</pubDate></item>
+</channel></rss>`, older, newer, same, same)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+	withFeedClient(t, newFeedClient())
+	syncOneFeed(feed.Feed{Id: 11, Url: srv.URL})
+
+	scoreOf := func(guid string) float64 {
+		t.Helper()
+		score, err := miniRedis.ZScore("feed_news:11", utils.Md5(guid))
+		if err != nil {
+			t.Fatalf("score of %s: %v", guid, err)
+		}
+		return score
+	}
+	if scoreOf("newer") <= scoreOf("older") {
+		t.Errorf("newer score %v is not above older score %v", scoreOf("newer"), scoreOf("older"))
+	}
+	if scoreOf("same-a") == scoreOf("same-b") {
+		t.Errorf("items that share a timestamp got the same score %v", scoreOf("same-a"))
+	}
+}
+
 func TestSyncOneFeed_NonOKStatusReturns(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnavailableForLegalReasons)

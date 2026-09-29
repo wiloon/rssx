@@ -122,7 +122,7 @@ func GetString(key string, def string) string {
 	envKey := toEnvKey(key)
 	envValue := os.Getenv(envKey)
 	if envValue != "" {
-		log.Printf("key: %s, value from env: %s", key, envValue)
+		log.Printf("key: %s, value from env: %s", key, redactConfigValue(key, envValue))
 		return envValue
 	}
 
@@ -140,6 +140,15 @@ func GetString(key string, def string) string {
 		}
 	}
 
+	return value
+}
+
+// redactConfigValue hides secrets in config logs.
+func redactConfigValue(key, value string) string {
+	lower := strings.ToLower(key)
+	if strings.Contains(lower, "key") || strings.Contains(lower, "password") || strings.Contains(lower, "secret") {
+		return "***"
+	}
 	return value
 }
 

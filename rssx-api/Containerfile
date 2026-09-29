@@ -50,8 +50,8 @@ RUN apk add --no-cache ca-certificates tzdata wget && \
 
 # Auto-start RSS feed sync task
 ENV RSSX_RSS_SYNC_AUTO=true
-# JWT signing key
-ENV RSSX_SECURITY_KEY=""
+# JWT signing key (RSSX_SECURITY_KEY) must be injected at run time. An empty
+# value is refused at startup.
 # Redis address (host:port)
 ENV REDIS_ADDRESS=""
 # RSS sync interval (minutes)

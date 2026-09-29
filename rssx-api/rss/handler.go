@@ -11,10 +11,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SyncAll triggers an immediate sync of all feeds.
+// SyncAll triggers an immediate sync of the feeds the current user subscribes to.
 func SyncAll(c *gin.Context) {
-	log.Info("manual sync all feeds triggered")
-	go syncFeeds()
+	userId := jwt.UserIdFromContext(c)
+	log.Infof("manual sync started for user %s", userId)
+	go syncUserFeeds(userId)
 	c.JSON(http.StatusOK, gin.H{"message": "sync started"})
 }
 

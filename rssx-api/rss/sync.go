@@ -29,14 +29,25 @@ func Sync() {
 }
 
 func syncFeeds() {
+	syncFeedList(feeds.FindSubscribedFeeds())
+}
+
+// syncUserFeeds syncs only the feeds one user subscribes to.
+func syncUserFeeds(userId string) {
+	syncFeedList(feeds.FindUserFeeds(userId))
+}
+
+func syncFeedList(feedList *[]feed.Feed) {
 	p, err := ants.NewPoolWithFunc(2, syncOneFeed)
 	if err != nil {
 		log.Errorf("failed to create sync pool: %v", err)
 		return
 	}
 	defer p.Release()
-	feedList := feeds.FindSubscribedFeeds()
-	log.Debugf("user feed list: %v", len(*feedList))
+	if feedList == nil {
+		return
+	}
+	log.Debugf("feed list: %v", len(*feedList))
 	for _, oneFeed := range *feedList {
 		log.Debugf("invoke ant pool, feed id: %d", oneFeed.Id)
 		err := p.Invoke(oneFeed)
@@ -122,16 +133,15 @@ func syncOneFeed(data interface{}) {
 			continue
 		}
 
-		newsList := list.NewList(0, oneFeed)
-
-		// since duplicate pub date, and invalid pub date, set time.now() as score, make sure no duplicate score
-		score := utils.TimeNowMicrosecond()
-
 		newsId := utils.Md5(guid)
 		// check if article is already exist in storage
 		article := news.DefaultArticle{FeedId: oneFeed.Id, Id: newsId}
 		if !article.IsExistInStorage() {
-			newsList.AppendNews(score, newsId)
+			// Higher score sorts newer. Publication time (else last update, else
+			// ingest time) keeps a newly published item ahead of older unread ones.
+			// tieBreak prefers the earlier entry in the document when timestamps match.
+			score := list.ReserveScore(oneFeed.Id, newsId, publicationScore(item, len(parsed.Items)-1-i))
+			list.NewList(0, oneFeed).AppendNews(score, newsId)
 			log.Debugf("score:%v, news id:%v", score, newsId)
 			oneNews := news.News{
 				Id:          newsId,
@@ -146,6 +156,24 @@ func syncOneFeed(data interface{}) {
 			oneNews.Save()
 		}
 	}
+}
+
+// publicationScore is the sort key for one item. Higher means newer.
+// tieBreak separates items that share a timestamp; it must stay far below the
+// gap between distinct publication seconds.
+func publicationScore(item *gofeed.Item, tieBreak int) int64 {
+	base := utils.TimeNowMicrosecond()
+	if published := itemTime(item); published != nil {
+		base = utils.TimeToMicroSecond(*published)
+	}
+	if base < 1 {
+		base = 1
+	}
+	score := base + int64(tieBreak)
+	if score < 1 {
+		return 1
+	}
+	return score
 }
 
 // itemTime is when the item was published, falling back to its last update

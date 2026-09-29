@@ -390,6 +390,7 @@ type feedItem struct {
 
 type articleItem struct {
 	Id       string
+	FeedId   int64
 	Title    string
 	NextId   string
 	ReadFlag bool
@@ -439,7 +440,7 @@ func TestReaderFlow(t *testing.T) {
 		t.Errorf("subscribed feed title = %q, want it to end with \" - 3\"", got)
 	}
 
-	// GET /news-list: the unread window has all three, none read.
+	// GET /news-list: the unread window is newest-first, none read.
 	_, body = doRaw(t, http.MethodGet, "/news-list?id="+id, nil)
 	var articles []articleItem
 	if err := json.Unmarshal(body, &articles); err != nil {
@@ -448,38 +449,42 @@ func TestReaderFlow(t *testing.T) {
 	if len(articles) != 3 {
 		t.Fatalf("unread window = %d articles, want 3: %s", len(articles), body)
 	}
-	for _, a := range articles {
+	ids := make([]string, len(articles))
+	for i, a := range articles {
+		ids[i] = a.Id
 		if a.ReadFlag {
 			t.Errorf("article %s should be unread in a fresh window", a.Id)
 		}
 	}
+	if strings.Join(ids, ",") != "a3,a2,a1" {
+		t.Errorf("unread window = %v, want newest-first [a3 a2 a1]", ids)
+	}
 
-	// GET /news for a1: returns its content and the next id, and marks it read.
-	_, body = doRaw(t, http.MethodGet, "/news?feedId="+id+"&id=a1", nil)
+	// GET /news for a3 (the newest): next is the following older article, and it is marked read.
+	_, body = doRaw(t, http.MethodGet, "/news?feedId="+id+"&id=a3", nil)
 	var one articleItem
 	if err := json.Unmarshal(body, &one); err != nil {
 		t.Fatalf("GET /news unmarshal: %v (%s)", err, body)
 	}
-	if one.Title != "Article One" {
-		t.Errorf("GET /news Title = %q, want Article One", one.Title)
+	if one.Title != "Article Three" {
+		t.Errorf("GET /news Title = %q, want Article Three", one.Title)
 	}
 	if one.NextId != "a2" {
 		t.Errorf("GET /news NextId = %q, want a2", one.NextId)
 	}
 
-	// The read boundary advanced past a1: the window is now [a2, a3] and the
-	// feed shows two unread.
+	// a3 is read; the window is the remaining unread articles, newest first.
 	_, body = doRaw(t, http.MethodGet, "/news-list?id="+id, nil)
 	json.Unmarshal(body, &articles)
-	ids := make([]string, len(articles))
+	ids = make([]string, len(articles))
 	for i, a := range articles {
 		ids[i] = a.Id
 	}
-	if strings.Join(ids, ",") != "a2,a3" {
-		t.Errorf("window after reading a1 = %v, want [a2 a3]", ids)
+	if strings.Join(ids, ",") != "a2,a1" {
+		t.Errorf("window after reading a3 = %v, want [a2 a1]", ids)
 	}
 	if got := titleOf(feedID); !strings.HasSuffix(got, " - 2") {
-		t.Errorf("after reading a1, feed title = %q, want it to end with \" - 2\"", got)
+		t.Errorf("after reading a3, feed title = %q, want it to end with \" - 2\"", got)
 	}
 
 	// GET /mark-read: advance the boundary past the whole page; feed hits zero.
@@ -586,6 +591,7 @@ func TestFeedManagementFlow(t *testing.T) {
 // and malformed feed ids.
 func TestPreviousAndMissingArticles(t *testing.T) {
 	resetState(t)
+	subscribeUser(t, testUserAlice, 5, 6)
 	seedArticle(5, "p1", "First", 100)
 	seedArticle(5, "p2", "Second", 200)
 
@@ -713,6 +719,18 @@ func TestMultiUserIsolation(t *testing.T) {
 	if code, _ := doRawAs(t, testUserBob, http.MethodPost, "/sync/"+aid, nil); code != http.StatusNotFound {
 		t.Errorf("bob syncing alice's feed: status %d, want 404", code)
 	}
+	if code, _ := doRawAs(t, testUserBob, http.MethodGet, "/news-list?id="+aid, nil); code != http.StatusNotFound {
+		t.Errorf("bob listing alice's articles: status %d, want 404", code)
+	}
+	if code, _ := doRawAs(t, testUserBob, http.MethodGet, "/news?feedId="+aid+"&id=s1", nil); code != http.StatusNotFound {
+		t.Errorf("bob reading alice's article: status %d, want 404", code)
+	}
+	if code, _ := doRawAs(t, testUserBob, http.MethodGet, "/mark-read?feedId="+aid, nil); code != http.StatusNotFound {
+		t.Errorf("bob marking alice's feed read: status %d, want 404", code)
+	}
+	if code, _ := doRawAs(t, testUserBob, http.MethodGet, "/previous-news?feedId="+aid+"&newsId=s1", nil); code != http.StatusNotFound {
+		t.Errorf("bob loading previous on alice's feed: status %d, want 404", code)
+	}
 
 	// A shared feed cannot be edited by one subscriber.
 	if code, _ := doRawAs(t, testUserAlice, http.MethodPut, "/feed/"+sid, map[string]string{"url": "https://example.com/shared2", "title": "S"}); code != http.StatusConflict {
@@ -745,16 +763,123 @@ func TestMultiUserIsolation(t *testing.T) {
 	}
 }
 
-// TestReaderFlow_UnknownFeed verifies an empty feed just yields an empty window.
+// TestReaderFlow_UnknownFeed verifies a feed the caller does not subscribe to
+// is hidden, and a malformed id is rejected.
 func TestReaderFlow_UnknownFeed(t *testing.T) {
 	resetState(t)
 
 	code, body := doRaw(t, http.MethodGet, "/news-list?id=999", nil)
+	if code != http.StatusNotFound {
+		t.Fatalf("GET /news-list for an unsubscribed feed: status %d, body %s", code, body)
+	}
+	if code, _ := doRaw(t, http.MethodGet, "/news-list?id=abc", nil); code != http.StatusBadRequest {
+		t.Errorf("GET /news-list with a bad id: status %d, want 400", code)
+	}
+
+	code, body = doRaw(t, http.MethodGet, "/news-list?id=-1", nil)
 	if code != http.StatusOK {
-		t.Fatalf("GET /news-list for empty feed: status %d", code)
+		t.Fatalf("GET /news-list for the all view: status %d, body %s", code, body)
 	}
 	trimmed := strings.TrimSpace(string(body))
 	if trimmed != "null" && trimmed != "[]" {
-		t.Errorf("empty feed window = %s, want null or []", trimmed)
+		t.Errorf("empty all view = %s, want null or []", trimmed)
+	}
+}
+
+func subscribeUser(t *testing.T, userId string, feedIDs ...int64) {
+	t.Helper()
+	for _, id := range feedIDs {
+		if err := common.DB.Create(&common.UserFeed{UserId: userId, FeedId: id}).Error; err != nil {
+			t.Fatalf("subscribe user %s to feed %d: %v", userId, id, err)
+		}
+	}
+}
+
+func TestAllView_MergesNewestFirst(t *testing.T) {
+	resetState(t)
+	feedA := addFeedAs(t, testUserAlice, "https://example.com/a", "A")
+	feedB := addFeedAs(t, testUserAlice, "https://example.com/b", "B")
+	seedArticle(feedA, "old-a", "Old A", 100)
+	seedArticle(feedA, "mid-a", "Mid A", 200)
+	seedArticle(feedB, "new-b", "New B", 300)
+
+	_, body := doRaw(t, http.MethodGet, "/news-list?id=-1", nil)
+	var articles []articleItem
+	if err := json.Unmarshal(body, &articles); err != nil {
+		t.Fatalf("all view unmarshal: %v (%s)", err, body)
+	}
+	if len(articles) != 3 {
+		t.Fatalf("all view = %d articles, want 3: %s", len(articles), body)
+	}
+	if articles[0].Id != "new-b" || articles[0].FeedId != feedB {
+		t.Errorf("first all-view article = %+v, want new-b from feed %d", articles[0], feedB)
+	}
+	if articles[1].Id != "mid-a" || articles[1].FeedId != feedA {
+		t.Errorf("second all-view article = %+v, want mid-a from feed %d", articles[1], feedA)
+	}
+	if articles[2].Id != "old-a" {
+		t.Errorf("third all-view article = %+v, want old-a", articles[2])
+	}
+
+	code, body := doRaw(t, http.MethodGet, "/previous-news?feedId=-1&newsId=mid-a", nil)
+	if code != http.StatusOK {
+		t.Fatalf("previous of mid-a: status %d, body %s", code, body)
+	}
+	var prev articleItem
+	if err := json.Unmarshal(body, &prev); err != nil {
+		t.Fatalf("previous unmarshal: %v (%s)", err, body)
+	}
+	if prev.Id != "old-a" || prev.FeedId != feedA {
+		t.Errorf("previous of mid-a = %+v, want old-a", prev)
+	}
+
+	if got := unreadOf(t, testUserAlice, -1); got != "3" {
+		t.Errorf("all view unread = %s, want 3", got)
+	}
+
+	bid := strconv.FormatInt(feedB, 10)
+	if code, body := doRaw(t, http.MethodGet, "/news?feedId="+bid+"&id=new-b", nil); code != http.StatusOK {
+		t.Fatalf("open new-b: status %d, body %s", code, body)
+	}
+	_, body = doRaw(t, http.MethodGet, "/news-list?id=-1", nil)
+	json.Unmarshal(body, &articles)
+	if len(articles) != 2 || articles[0].Id != "mid-a" || articles[1].Id != "old-a" {
+		t.Errorf("all view after reading new-b = %+v, want [mid-a old-a]", articles)
+	}
+	if got := unreadOf(t, testUserAlice, -1); got != "2" {
+		t.Errorf("all view unread after reading one = %s, want 2", got)
+	}
+}
+
+func TestSyncAll_OnlyCallerFeeds(t *testing.T) {
+	resetState(t)
+	aliceHit := make(chan struct{}, 1)
+	bobHit := make(chan struct{}, 1)
+	aliceSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		aliceHit <- struct{}{}
+		_, _ = w.Write([]byte(`<rss version="2.0"><channel><title>a</title></channel></rss>`))
+	}))
+	defer aliceSrv.Close()
+	bobSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bobHit <- struct{}{}
+		_, _ = w.Write([]byte(`<rss version="2.0"><channel><title>b</title></channel></rss>`))
+	}))
+	defer bobSrv.Close()
+
+	addFeedAs(t, testUserAlice, aliceSrv.URL, "Alice")
+	addFeedAs(t, testUserBob, bobSrv.URL, "Bob")
+
+	if code, body := doRawAs(t, testUserBob, http.MethodPost, "/sync", nil); code != http.StatusOK {
+		t.Fatalf("POST /sync: status %d, body %s", code, body)
+	}
+	select {
+	case <-bobHit:
+	case <-time.After(3 * time.Second):
+		t.Fatal("sync did not fetch the caller's feed")
+	}
+	select {
+	case <-aliceHit:
+		t.Fatal("sync fetched another user's feed")
+	case <-time.After(400 * time.Millisecond):
 	}
 }

@@ -45,10 +45,21 @@ export function createReaderStore (
     state.feeds = await api.listFeeds()
   }
 
+  /**
+   * Feed id to load an article from. The All view keeps selectedFeedId at -1,
+   * so the request uses the article's own feed.
+   */
+  function feedIdFor (articleId: string): number | null {
+    const article = state.list.articles.find((item) => item.id === articleId)
+    if (article && article.feedId > 0) return article.feedId
+    return state.selectedFeedId
+  }
+
   /** Open an article in the reading pane; it greys out in the middle column. */
   async function openArticle (articleId: string): Promise<void> {
-    if (state.selectedFeedId === null) return
-    state.open = await api.getArticle(state.selectedFeedId, articleId)
+    const feedId = feedIdFor(articleId)
+    if (feedId === null || feedId <= 0) return
+    state.open = await api.getArticle(feedId, articleId)
     state.list = selectArticle(state.list, articleId)
   }
 
@@ -73,9 +84,21 @@ export function createReaderStore (
       state.list = loadOlder(state.list, previous.article)
     },
 
-    /** Open the article after the one in the reading pane, if there is one. */
+    /**
+     * Open the following row in the current list (newest first, so that is the
+     * next older article). Falls back to the server's nextId when the open
+     * article is no longer in the list.
+     */
     async openNext (): Promise<void> {
-      if (state.open === null || state.open.nextId === '') return
+      if (state.open === null) return
+      const index = state.list.articles.findIndex((item) => item.id === state.open!.article.id)
+      if (index >= 0) {
+        const next = state.list.articles[index + 1]
+        if (!next) return
+        await openArticle(next.id)
+        return
+      }
+      if (state.open.nextId === '') return
       await openArticle(state.open.nextId)
     },
 

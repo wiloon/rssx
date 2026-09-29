@@ -16,12 +16,12 @@ func Login(c *gin.Context) {
 	err := c.BindJSON(&u)
 	if err != nil {
 		log.Debugf("login, failed to parse params err: %v", err)
-		response.ShowError(c, "用户名或密码格式错误")
+		response.ShowError(c, "Invalid username or password")
 		return
 	}
-	log.Debugf("user login, params: %+v", u)
+	log.Debugf("user login, name: %s", u.Name)
 	if u.Name == "" || u.Password == "" {
-		response.ShowError(c, "用户名或密码为空")
+		response.ShowError(c, "Username and password are required")
 		return
 	}
 	if u.Validate() {
@@ -29,10 +29,10 @@ func Login(c *gin.Context) {
 		var data = make(map[string]interface{}, 0)
 
 		data["token"] = jwtTokenString
-		log.Infof("user login, jwt token generated, token: %s", jwtTokenString)
+		log.Infof("user login, jwt issued, user id: %s", u.Id)
 		response.ShowData(c, data)
 	} else {
-		response.ShowError(c, "用户名或密码错误")
+		response.ShowError(c, "Invalid username or password")
 	}
 	return
 }
