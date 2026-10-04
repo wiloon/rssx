@@ -5,6 +5,11 @@ FROM node:18-alpine AS builder
 
 WORKDIR /build
 
+# Homelab CI passes the in-cluster Nexus npm group here; a bare build leaves it
+# empty and keeps the public registry.
+ARG NPM_REGISTRY=
+RUN if [ -n "$NPM_REGISTRY" ]; then npm config set registry "$NPM_REGISTRY"; fi
+
 # Install pnpm globally
 RUN npm install -g pnpm
 
