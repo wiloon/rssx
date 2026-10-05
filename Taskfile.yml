@@ -1,5 +1,14 @@
 version: '3'
 
+vars:
+  # ROOT_DIR follows the invocation path; resolve symlinks so ../w10n-config
+  # points at the sibling checkout.
+  RSSX_REAL_DIR:
+    sh: realpath '{{.ROOT_DIR}}'
+  W10N_HOMELAB: '{{.RSSX_REAL_DIR}}/../w10n-config/infra/homelab'
+  CURRENT_BRANCH:
+    sh: git -C '{{.ROOT_DIR}}' rev-parse --abbrev-ref HEAD
+
 tasks:
   default:
     cmds:
@@ -34,17 +43,25 @@ tasks:
     cmds:
       - fnm exec --using=18 pnpm serve
 
-  deploy:api:
-    desc: 触发 Tekton Pipeline 构建并部署 rssx-api
+  deploy:homelab:
+    desc: "Build+deploy the CURRENT branch's api & ui to homelab via Tekton + ArgoCD; skips a service the cluster already runs. REV=<branch|tag>, FORCE=true to rebuild anyway"
+    dir: '{{.W10N_HOMELAB}}'
     cmds:
-      - kubectl create -f ~/workspace/w10n-config/homelab/k8s/tekton/pipelinerun-rssx-api.yaml
+      - task tekton-deploy-rssx SERVICE=both REV={{.REV | default .CURRENT_BRANCH}} FORCE={{.FORCE | default "false"}} RSSX_DIR={{.RSSX_REAL_DIR}}
 
-  deploy:api:logs:
-    desc: 查看最新一次 rssx-api 构建日志
+  deploy:homelab:api:
+    desc: "Build+deploy ONLY the CURRENT branch's api to homelab; skips if the cluster already runs it. REV=<branch|tag>, FORCE=true to rebuild anyway"
+    dir: '{{.W10N_HOMELAB}}'
+    cmds:
+      - task tekton-deploy-rssx SERVICE=api REV={{.REV | default .CURRENT_BRANCH}} FORCE={{.FORCE | default "false"}} RSSX_DIR={{.RSSX_REAL_DIR}}
+
+  deploy:homelab:ui:
+    desc: "Build+deploy ONLY the CURRENT branch's ui to homelab; skips if the cluster already runs it. REV=<branch|tag>, FORCE=true to rebuild anyway"
+    dir: '{{.W10N_HOMELAB}}'
+    cmds:
+      - task tekton-deploy-rssx SERVICE=ui REV={{.REV | default .CURRENT_BRANCH}} FORCE={{.FORCE | default "false"}} RSSX_DIR={{.RSSX_REAL_DIR}}
+
+  deploy:logs:
+    desc: 查看最新一次 Tekton 构建日志
     cmds:
       - tkn pipelinerun logs -n tekton-pipelines -f --last
-
-  deploy:ui:
-    desc: 触发 Tekton Pipeline 构建并部署 rssx-ui
-    cmds:
-      - kubectl create -f ~/workspace/w10n-config/homelab/k8s/tekton/pipelinerun-rssx-ui.yaml
