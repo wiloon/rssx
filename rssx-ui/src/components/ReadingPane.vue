@@ -18,7 +18,9 @@ defineEmits<{
 </script>
 
 <template>
-  <article class="reading-pane">
+  <!-- The pane is chrome; only the open Article is an <article>. Catglish
+       (enx adr-033) relies on that to find the text to process. -->
+  <section class="reading-pane">
     <header class="reading-pane__header">
       <button data-test="back" class="reading-pane__back" @click="$emit('back')">
         ‹
@@ -26,7 +28,7 @@ defineEmits<{
     </header>
 
     <template v-if="open">
-      <div data-test="article" class="reading-pane__article">
+      <article data-test="article" class="reading-pane__article">
         <h1 data-test="title" class="reading-pane__title">
           {{ open.article.title }}
         </h1>
@@ -60,13 +62,13 @@ defineEmits<{
             Next article →
           </button>
         </div>
-      </div>
+      </article>
     </template>
 
     <div v-else class="reading-pane__empty-wrap">
       <p data-test="empty" class="reading-pane__empty">Select an article to read</p>
     </div>
-  </article>
+  </section>
 </template>
 
 <style scoped>
