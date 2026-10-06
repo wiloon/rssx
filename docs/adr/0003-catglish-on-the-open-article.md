@@ -67,3 +67,7 @@ decision is recorded in enx `docs/architecture/adr-033-rssx-reading-pane-learnin
   click-to-lookup, or Vue's render wipes the previous pass.
 - Lookup still requires a signed-in Catglish session and still counts against
   Catglish's lookup quota. RSSX does not grow a dictionary or a billing path.
+- The open Article is the Reader's only `<article>` element; the Reading pane
+  around it and the two columns are `<section>`s. That semantic markup is the
+  whole contract with the extension: Catglish does not read RSSX class names
+  or `data-test` hooks. Keep it when restyling the Reader.

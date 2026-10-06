@@ -78,4 +78,19 @@ describe('ReadingPane — the right pane', () => {
       last.get('[data-test="next"]').attributes('disabled')
     ).toBeDefined()
   })
+
+  // Catglish (enx adr-033) reads the open Article as the page's only
+  // <article>: the pane chrome around it is not part of it, and an empty
+  // pane has none.
+  it('renders the open article as the only <article>, with title and body inside', () => {
+    const empty = mount(ReadingPane, { props: { open: null } })
+    expect(empty.findAll('article')).toHaveLength(0)
+
+    const wrapper = mount(ReadingPane, { props: { open: open() } })
+    const articles = wrapper.findAll('article')
+    expect(articles).toHaveLength(1)
+    expect(articles[0].find('[data-test="title"]').exists()).toBe(true)
+    expect(articles[0].find('[data-test="body"]').exists()).toBe(true)
+    expect(articles[0].find('[data-test="back"]').exists()).toBe(false)
+  })
 })
