@@ -3,11 +3,14 @@ package jwt
 import (
 	"encoding/base64"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -449,6 +452,152 @@ func TestParseToken_BusinessLayer_Expired(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for expired token, got nil")
 	}
+}
+
+func TestNewToken_ExpiresInThirtyDays(t *testing.T) {
+	t.Setenv("RSSX_SECURITY_KEY", "test-rssx-security-key")
+
+	before := time.Now()
+	payload, err := ParseToken(NewToken("user-id-xyz"))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	exp := time.Unix(payload.Exp, 0)
+	earliest := before.Add(tokenTTL).Add(-2 * time.Second)
+	latest := time.Now().Add(tokenTTL).Add(2 * time.Second)
+	if exp.Before(earliest) || exp.After(latest) {
+		t.Fatalf("exp %s, want about %s from issuance", exp, tokenTTL)
+	}
+}
+
+func TestMaybeRefreshToken(t *testing.T) {
+	t.Setenv("RSSX_SECURITY_KEY", "test-rssx-security-key")
+	now := time.Now()
+
+	tests := []struct {
+		name    string
+		payload *Payload
+		wantNew bool
+	}{
+		{
+			name:    "nil payload",
+			payload: nil,
+		},
+		{
+			name: "fresh token",
+			payload: &Payload{
+				Id:  "user-1",
+				Iat: now.Unix(),
+				Exp: now.Add(tokenTTL).Unix(),
+			},
+		},
+		{
+			name: "already expired",
+			payload: &Payload{
+				Id:  "user-1",
+				Iat: now.Add(-tokenTTL - time.Hour).Unix(),
+				Exp: now.Add(-time.Hour).Unix(),
+			},
+		},
+		{
+			name: "aged but still valid",
+			payload: &Payload{
+				Id:  "user-1",
+				Iat: now.Add(-refreshAfter - time.Minute).Unix(),
+				Exp: now.Add(tokenTTL - refreshAfter).Unix(),
+			},
+			wantNew: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := MaybeRefreshToken(tt.payload)
+			if !tt.wantNew {
+				if got != "" {
+					t.Fatalf("expected no replacement token, got %q", got)
+				}
+				return
+			}
+			if got == "" {
+				t.Fatal("expected a replacement token")
+			}
+			parsed, err := ParseToken(got)
+			if err != nil {
+				t.Fatalf("replacement token: %v", err)
+			}
+			if parsed.Id != tt.payload.Id {
+				t.Fatalf("id: got %s, want %s", parsed.Id, tt.payload.Id)
+			}
+			if time.Unix(parsed.Exp, 0).Before(now.Add(tokenTTL).Add(-2 * time.Second)) {
+				t.Fatalf("replacement exp %d is not a fresh %s session", parsed.Exp, tokenTTL)
+			}
+		})
+	}
+}
+
+func TestRequireAuth_RenewsAgedSession(t *testing.T) {
+	const key = "test-rssx-security-key"
+	t.Setenv("RSSX_SECURITY_KEY", key)
+	gin.SetMode(gin.TestMode)
+
+	now := time.Now()
+	aged := signTestToken(t, key, RssxClaims{
+		Id: "user-1",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Audience:  jwt.ClaimStrings{"rssx.wiloon.net"},
+			ExpiresAt: jwt.NewNumericDate(now.Add(tokenTTL - refreshAfter)),
+			IssuedAt:  jwt.NewNumericDate(now.Add(-refreshAfter - time.Minute)),
+			Issuer:    "wiloon.com",
+			NotBefore: jwt.NewNumericDate(now.Add(-refreshAfter - time.Minute)),
+			Subject:   "rssx",
+		},
+	})
+	fresh := NewToken("user-1")
+
+	router := gin.New()
+	router.GET("/ping", RequireAuth(), func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	agedRes := doAuthRequest(router, aged)
+	if agedRes.Code != http.StatusNoContent {
+		t.Fatalf("aged token status: got %d", agedRes.Code)
+	}
+	renewed := agedRes.Header().Get(HeaderNewToken)
+	if renewed == "" {
+		t.Fatal("expected a renewed session token")
+	}
+	parsed, err := ParseToken(renewed)
+	if err != nil || parsed.Id != "user-1" {
+		t.Fatalf("renewed token: id=%v err=%v", parsed, err)
+	}
+
+	freshRes := doAuthRequest(router, fresh)
+	if freshRes.Code != http.StatusNoContent {
+		t.Fatalf("fresh token status: got %d", freshRes.Code)
+	}
+	if got := freshRes.Header().Get(HeaderNewToken); got != "" {
+		t.Fatalf("fresh token was renewed: %s", got)
+	}
+}
+
+func signTestToken(t *testing.T, key string, claims RssxClaims) string {
+	t.Helper()
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, err := token.SignedString([]byte(key))
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	return signed
+}
+
+func doAuthRequest(router http.Handler, token string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	return res
 }
 
 // TestParseToken_BusinessLayer_InvalidSignature verifies the business-layer ParseToken

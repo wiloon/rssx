@@ -27,14 +27,16 @@ async function login (): Promise<void> {
 
 <template>
   <v-container class="mx-auto" style="max-width: 400px">
-    <v-text-field v-model="name" data-cy="user-name" label="Username" />
-    <v-text-field
-      v-model="password"
-      data-cy="password"
-      label="Password"
-      type="password"
-    />
-    <v-btn block color="primary" data-cy="login" @click="login">Sign in</v-btn>
+    <v-form @submit.prevent="login">
+      <v-text-field v-model="name" data-cy="user-name" label="Username" />
+      <v-text-field
+        v-model="password"
+        data-cy="password"
+        label="Password"
+        type="password"
+      />
+      <v-btn block color="primary" data-cy="login" type="submit">Sign in</v-btn>
+    </v-form>
     <v-snackbar v-model="snackbar" :timeout="3000">{{ msg }}</v-snackbar>
   </v-container>
 </template>

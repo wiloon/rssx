@@ -1,5 +1,5 @@
 import { AxiosError, AxiosHeaders, InternalAxiosRequestConfig } from 'axios'
-import { attachToken, handleUnauthorized } from '@/api/http'
+import { attachToken, captureRefreshedToken, handleUnauthorized } from '@/api/http'
 import { getJwtToken, setJwtToken } from '@/utils/auth'
 
 function requestConfig (): InternalAxiosRequestConfig {
@@ -28,6 +28,22 @@ describe('attachToken', () => {
   it('leaves the request untouched when no token is stored', () => {
     const config = attachToken(requestConfig())
     expect(config.headers.has('Authorization')).toBe(false)
+  })
+})
+
+describe('captureRefreshedToken', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('stores a renewed session token from the response header', () => {
+    setJwtToken('old.token')
+    captureRefreshedToken(new AxiosHeaders({ 'x-new-token': 'new.token' }))
+    expect(getJwtToken()).toBe('new.token')
+  })
+
+  it('keeps the current token when the response has no renewal', () => {
+    setJwtToken('old.token')
+    captureRefreshedToken(new AxiosHeaders())
+    expect(getJwtToken()).toBe('old.token')
   })
 })
 

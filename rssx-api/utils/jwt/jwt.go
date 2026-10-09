@@ -25,6 +25,18 @@ func init() {
 	tokenRefreshCache = cache.New(1*time.Minute, 10*time.Minute)
 }
 
+const (
+	// tokenTTL is how long a session stays valid when the app is not used.
+	tokenTTL = 30 * 24 * time.Hour
+	// refreshAfter is how old a still-valid token must be before the next
+	// authenticated request replaces it. Opening the app at least once
+	// within tokenTTL keeps the session alive.
+	refreshAfter = 24 * time.Hour
+)
+
+// HeaderNewToken is set on authenticated responses when the session is renewed.
+const HeaderNewToken = "X-New-Token"
+
 // RssxClaims is the custom claims structure for RSSX tokens.
 // In jwt/v5, we embed jwt.RegisteredClaims instead of using jwt.StandardClaims.
 type RssxClaims struct {
@@ -33,17 +45,18 @@ type RssxClaims struct {
 }
 
 // NewToken generates a new JWT token for the given user ID.
-// The token expires in 1 day and uses HS256 signing method.
+// The token expires after tokenTTL and uses HS256 signing method.
 func NewToken(id string) string {
+	now := time.Now()
 	claims := RssxClaims{
 		Id: id,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Audience:  jwt.ClaimStrings{"rssx.wiloon.net"},
-			ExpiresAt: jwt.NewNumericDate(time.Now().AddDate(0, 0, 1)),
+			ExpiresAt: jwt.NewNumericDate(now.Add(tokenTTL)),
 			ID:        uuid.New().String(),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			IssuedAt:  jwt.NewNumericDate(now),
 			Issuer:    "wiloon.com",
-			NotBefore: jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(now),
 			Subject:   "rssx",
 		},
 	}
@@ -213,8 +226,27 @@ func RequireAuth() gin.HandlerFunc {
 			return
 		}
 		c.Set(ContextKeyUserId, p.Id)
+		if refreshed := MaybeRefreshToken(p); refreshed != "" {
+			c.Header(HeaderNewToken, refreshed)
+		}
 		c.Next()
 	}
+}
+
+// MaybeRefreshToken returns a replacement token when p is still valid but
+// older than refreshAfter. A fresh or already-expired payload yields "".
+func MaybeRefreshToken(p *Payload) string {
+	if p == nil || p.Id == "" || p.Iat == 0 {
+		return ""
+	}
+	now := time.Now()
+	if p.Exp != 0 && !now.Before(time.Unix(p.Exp, 0)) {
+		return ""
+	}
+	if now.Sub(time.Unix(p.Iat, 0)) < refreshAfter {
+		return ""
+	}
+	return NewToken(p.Id)
 }
 
 // UserIdFromContext returns the authenticated user's ID stored by RequireAuth,

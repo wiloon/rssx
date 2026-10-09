@@ -4,9 +4,9 @@
  * strips it, so requests are made against /api here.
  */
 
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
+import axios, { AxiosError, AxiosHeaders, AxiosResponseHeaders, InternalAxiosRequestConfig, RawAxiosResponseHeaders } from 'axios'
 import type { HttpClient } from '@/api/reader'
-import { getJwtToken, removeJwtToken } from '@/utils/auth'
+import { getJwtToken, removeJwtToken, setJwtToken } from '@/utils/auth'
 
 export const axiosInstance = axios.create({ baseURL: '/api' })
 
@@ -33,9 +33,28 @@ export function handleUnauthorized (onUnauthorized: () => void) {
   }
 }
 
+/**
+ * Stores a replacement session token when the API renewed it.
+ * Active use keeps the session alive; an unused session still expires.
+ */
+export function captureRefreshedToken (
+  headers: AxiosResponseHeaders | RawAxiosResponseHeaders
+): void {
+  const raw = headers instanceof AxiosHeaders
+    ? headers.get('x-new-token')
+    : headers['x-new-token']
+  const token = Array.isArray(raw) ? raw[0] : raw
+  if (typeof token === 'string' && token !== '') {
+    setJwtToken(token)
+  }
+}
+
 axiosInstance.interceptors.request.use(attachToken)
 axiosInstance.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    captureRefreshedToken(response.headers)
+    return response
+  },
   // Imported lazily: the router pulls in views that import this module.
   handleUnauthorized(() => {
     void import('@/router').then(({ default: router }) => {
