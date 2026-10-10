@@ -36,7 +36,6 @@ defineEmits<{
         }"
         @click="$emit('select', a.id)"
       >
-        <span class="article-column__dot" aria-hidden="true" />
         <span class="article-column__title">{{ a.title }}</span>
       </li>
     </ul>
@@ -113,21 +112,10 @@ defineEmits<{
 .article-column__item:hover {
   background: rgba(0, 0, 0, 0.04);
 }
-.article-column__dot {
-  margin-top: 6px;
-  width: 6px;
-  height: 6px;
-  min-width: 6px;
-  border-radius: 50%;
-  background: #1976d2;
-}
 .article-column__title {
   font-size: 14px;
   line-height: 1.4;
   font-weight: 600;
-}
-.article-column__item.is-read .article-column__dot {
-  background: transparent;
 }
 .article-column__item.is-read .article-column__title {
   font-weight: 400;
