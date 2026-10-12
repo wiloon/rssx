@@ -35,13 +35,13 @@ tasks:
     desc: 安装 UI 依赖（使用 pnpm + fnm）
     dir: rssx-ui
     cmds:
-      - fnm exec --using=18 pnpm install
+      - fnm exec --using=24 pnpm install
 
   ui:run:
     desc: 启动 RSSX UI 开发服务器
     dir: rssx-ui
     cmds:
-      - fnm exec --using=18 pnpm serve
+      - fnm exec --using=24 pnpm serve
 
   deploy:homelab:
     desc: "Build+deploy the CURRENT branch's api & ui to homelab via Tekton + ArgoCD; skips a service the cluster already runs. REV=<branch|tag>, FORCE=true to rebuild anyway"

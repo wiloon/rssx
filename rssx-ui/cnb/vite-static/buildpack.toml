@@ -1,0 +1,16 @@
+# A minimal Cloud Native Buildpack for rssx-ui: builds the Vite SPA and ships
+# ONLY dist/ plus the static-web-server binary -- the CNB counterpart of the
+# Containerfile's node build + nginx runtime.
+#
+# Runs on an Ubuntu 24.04 build image (heroku/builder:24's) and targets the
+# Paketo ubuntu-noble-run-tiny run image (no shell).
+api = "0.10"
+
+[buildpack]
+id = "rssx/vite-static"
+version = "0.1.0"
+name = "rssx Vite static site"
+
+[[targets]]
+os = "linux"
+arch = "amd64"
