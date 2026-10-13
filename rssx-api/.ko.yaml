@@ -1,0 +1,16 @@
+# ko build settings for rssx-api. Run through build/build.sh, which supplies
+# the base image (build/build.conf).
+defaultPlatforms:
+  - linux/amd64
+
+builds:
+  - id: rssx-api
+    main: .
+    env:
+      # Pure-Go SQLite (glebarez/sqlite): no C toolchain, static binary.
+      - CGO_ENABLED=0
+    # -trimpath and -s -w shrink the binary and make builds reproducible.
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w

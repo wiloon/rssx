@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# Build the Vite SPA and leave only what the server needs at runtime:
+#
+#   layers/node      build+cache   full Node.js tarball (npm) for the build
+#   layers/pnpm      build+cache   pnpm, the version pinned in packageManager
+#   layers/store     cache         pnpm content-addressable store
+#   layers/server    launch+cache  static-web-server -- the only runtime layer
+#   app dir                        replaced by the contents of dist/
+#
+# Platform env (npm/pnpm registry) is applied to this process by the
+# lifecycle (buildpack.toml leaves clear-env at false).
+set -euo pipefail
+
+LAYERS=$CNB_LAYERS_DIR
+APP=$PWD
+
+# static-web-server, statically linked (musl): runs on the shell-less run image.
+SWS_VERSION=v2.44.0
+SWS_SHA256=804bc0c31c78385ac04e9a36f3c2aa3d3170eb77d66807c2a1660c56b2026bb1
+SWS_DIST=static-web-server-${SWS_VERSION}-x86_64-unknown-linux-musl
+
+step() { echo "---> $*"; }
+
+NODE_VERSION=$(tr -d ' \n' < .node-version)
+NODE_DIST=node-v${NODE_VERSION}-linux-x64
+
+write_layer_toml() { # name build launch cache [metadata-version]
+  cat > "$LAYERS/$1.toml" <<EOF
+[types]
+build = $2
+launch = $3
+cache = $4
+
+[metadata]
+version = "${5:-}"
+EOF
+}
+
+cached_version() { # name -> version recorded in a restored layer's metadata
+  # The lifecycle re-serialises restored layer TOML (indented keys).
+  sed -n 's/^[[:space:]]*version = "\(.*\)"/\1/p' "$LAYERS/$1.toml" 2>/dev/null | head -1
+}
+
+# --- Node.js for the build ------------------------------------------------------
+if [ "$(cached_version node)" = "$NODE_VERSION" ] && [ -x "$LAYERS/node/bin/node" ]; then
+  step "Reusing Node.js $NODE_VERSION"
+else
+  step "Downloading Node.js $NODE_VERSION"
+  rm -rf "$LAYERS/node" && mkdir -p "$LAYERS/node"
+  # Bounded, and to a file rather than a pipe: a retried transfer restarts
+  # from byte 0.
+  curl -fsSL --connect-timeout 15 --max-time 180 --retry 3 --retry-all-errors \
+    -o /tmp/node.tar.gz "https://nodejs.org/dist/v${NODE_VERSION}/${NODE_DIST}.tar.gz"
+  tar -xzf /tmp/node.tar.gz -C "$LAYERS/node" --strip-components=1
+  rm -f /tmp/node.tar.gz
+fi
+write_layer_toml node true false true "$NODE_VERSION"
+export PATH="$LAYERS/node/bin:$PATH"
+
+# --- static-web-server for the runtime ------------------------------------------
+if [ "$(cached_version server)" = "$SWS_VERSION" ] && [ -x "$LAYERS/server/bin/static-web-server" ]; then
+  step "Reusing static-web-server $SWS_VERSION"
+else
+  step "Downloading static-web-server $SWS_VERSION"
+  rm -rf "$LAYERS/server" && mkdir -p "$LAYERS/server/bin"
+  curl -fsSL --connect-timeout 15 --max-time 180 --retry 3 --retry-all-errors \
+    -o /tmp/sws.tar.gz \
+    "https://github.com/static-web-server/static-web-server/releases/download/${SWS_VERSION}/${SWS_DIST}.tar.gz"
+  echo "$SWS_SHA256  /tmp/sws.tar.gz" | sha256sum -c -
+  tar -xzf /tmp/sws.tar.gz -C /tmp
+  mv "/tmp/$SWS_DIST/static-web-server" "$LAYERS/server/bin/"
+  rm -rf /tmp/sws.tar.gz "/tmp/$SWS_DIST"
+fi
+write_layer_toml server false true true "$SWS_VERSION"
+
+# --- pnpm, the exact version from package.json's packageManager -----------------
+# `npm install -g` the pinned version through the configured registry, like
+# enx-ui. (Corepack's pnpm 12 launcher fetches its platform binary on its own
+# and fails on the Nexus packument: no `integrity` field.)
+PNPM_SPEC=$(node -p "require('./package.json').packageManager")
+if [ "$(cached_version pnpm)" = "$PNPM_SPEC" ] && [ -x "$LAYERS/pnpm/bin/pnpm" ]; then
+  step "Reusing $PNPM_SPEC"
+else
+  step "Installing $PNPM_SPEC"
+  rm -rf "$LAYERS/pnpm" && mkdir -p "$LAYERS/pnpm"
+  npm install -g --prefix "$LAYERS/pnpm" "$PNPM_SPEC"
+fi
+write_layer_toml pnpm true false true "$PNPM_SPEC"
+export PATH="$LAYERS/pnpm/bin:$PATH"
+step "pnpm $(pnpm --version)"
+
+# --- dependencies -----------------------------------------------------------------
+mkdir -p "$LAYERS/store"
+write_layer_toml store false false true
+step "pnpm install --frozen-lockfile"
+pnpm install --frozen-lockfile --store-dir "$LAYERS/store/v"
+
+# --- build ----------------------------------------------------------------------------
+step "pnpm run build"
+pnpm run build
+
+# --- keep only the static site --------------------------------------------------
+step "Assembling the static site"
+OUT=$(mktemp -d)
+cp -r dist/. "$OUT"/
+find "$APP" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+cp -r "$OUT"/. "$APP"/
+rm -rf "$OUT"
+
+# The app dir is the working directory at runtime. Port 8080: the run image's
+# user is not root and can't bind 80. Cache-Control headers off, as with the
+# old nginx image: static-web-server would otherwise cache index.html for a
+# day and keep serving a stale UI after a deploy. Unknown paths fall back to
+# index.html for the Vue router (nginx's try_files).
+cat > "$LAYERS/launch.toml" <<'EOF'
+[[processes]]
+type = "web"
+command = ["static-web-server"]
+args = ["--host", "0.0.0.0", "--port", "8080", "--root", ".", "--page-fallback", "./index.html", "--cache-control-headers", "false", "--health", "true"]
+default = true
+EOF
+
+step "App dir now holds: $(ls -A "$APP" | tr '\n' ' ')"

@@ -82,13 +82,12 @@ RSSX is a modern RSS reader application consisting of:
 - TypeScript 5.6
 - Vuetify 3 (Material Design)
 - Pinia (state) + Vue Router 4
-- Vite 5 (build/dev), Node 18
+- Vite 5 (build/dev), Node 24 (see rssx-ui/.node-version)
 - Vitest + Vue Test Utils (unit); e2e not yet ported to the three-pane UI
 
 **Deployment:**
-- Docker/Podman containers
-- Kubernetes support
-- GitHub Actions (CI/CD)
+- Homelab Kubernetes via Tekton + ArgoCD (`task deploy:homelab`)
+- rssx-api image: ko (`rssx-api/build/`), rssx-ui image: Cloud Native Buildpacks (`rssx-ui/cnb/`)
 
 ## Repository Structure
 
@@ -316,7 +315,7 @@ golangci-lint run
 
 ### Frontend (rssx-ui/)
 ```bash
-# Requires Node 18 (see .node-version)
+# Requires Node 24 and pnpm 12 (see .node-version / packageManager)
 
 # Install dependencies
 pnpm install
@@ -425,7 +424,22 @@ chore(ci): configure GitHub Actions workflow
 
 ## Deployment
 
-### Docker/Podman
+### Homelab images (Tekton)
+
+The homelab pipelines (w10n-config `infra/homelab/k8s/tekton/`) run the build
+scripts in this repo, so the build definition lives here:
+
+- **rssx-api** -- ko. `rssx-api/build/build.sh` runs `go vet` + `go test`, then
+  `ko build`. Go, ko and the base image are pinned in `rssx-api/build/build.conf`;
+  ko settings in `rssx-api/.ko.yaml`.
+- **rssx-ui** -- Cloud Native Buildpacks. `rssx-ui/cnb/build.sh` runs the CNB
+  lifecycle with the repo's own buildpack `rssx-ui/cnb/vite-static` (Vite build,
+  served by static-web-server on port 8080). Builder and run image are pinned in
+  `rssx-ui/cnb/images.conf`; Node in `.node-version`, pnpm in `packageManager`.
+
+To upgrade a build tool, change the pinned value in those files only.
+
+### Docker/Podman (local)
 ```bash
 # Build backend image
 cd rssx-api
@@ -433,7 +447,7 @@ podman build -t rssx-api:latest -f Containerfile .
 
 # Build frontend image
 cd rssx-ui
-podman build -t rssx-ui:latest -f Dockerfile .
+podman build -t rssx-ui:latest -f Containerfile .
 
 # Run with environment variables
 podman run -d \
